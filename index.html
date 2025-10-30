@@ -47,7 +47,7 @@ function drawResultsTable(doc, {lang, x, y, w}, rows){
   // Encabezado
   doc.setFillColor(240,240,240);
   doc.rect(x, y, w, HROW, 'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  doc.setFont('helvetica','bold'); doc.setFontSize(10);
 
   const H = (t)=> (lang==='en'?t.en:t.es);
   const HEADS = [
@@ -62,7 +62,7 @@ function drawResultsTable(doc, {lang, x, y, w}, rows){
   y += HROW;
 
   // Filas
-  doc.setFont('helvetica','normal'); doc.setFontSize(11);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9);
   rows.forEach(r=>{
     // líneas divisorias
     doc.setDrawColor(230); doc.line(x, y, x+w, y);
@@ -96,7 +96,7 @@ function drawResultsTable(doc, {lang, x, y, w}, rows){
 }
 
 // --- Espaciados estándar (pt)
-const GAP = { xs: 8, sm: 12, md: 18, lg: 28, xl: 40 };
+const GAP = { xs: 6, sm: 12, md: 18, lg: 28, xl: 40 };
 function bump(y, a = GAP.md){ return y + a; }
 
 
@@ -354,13 +354,13 @@ async function generarPDFyDescargar(data){
 
   // Subtítulo institucional
     doc.setFont('helvetica','bold');
-    doc.setFontSize(12);
+    doc.setFontSize(14);
     doc.text('Innovación Regenerativa', M_LEFT, y);
    y = bump(y, GAP.md);       // antes y += 20
 
 
   // Subtítulo
-  doc.setFontSize(12);
+  doc.setFontSize(11);
   doc.setFont('helvetica','normal');
   y += 4;
    doc.text(
@@ -393,7 +393,7 @@ doc.setFont(labelFont, 'bold');
 doc.text(data.idioma === 'en' ? 'Organization:' : 'Empresa:', M_LEFT + 220, y);
 doc.setFont(valueFont, 'normal');
 doc.text(data.empresa, M_LEFT + 300, y);
-y += 14;
+y = bump(y, GAP.md);
 
 // Línea 2: Puesto + País
 doc.setFont(labelFont, 'bold');
@@ -405,15 +405,14 @@ doc.setFont(labelFont, 'bold');
 doc.text(data.idioma === 'en' ? 'Country:' : 'País:', M_LEFT + 220, y);
 doc.setFont(valueFont, 'normal');
 doc.text(data.pais || '', M_LEFT + 260, y);
-y += 14;
-y = bump(y, GAP.sm); 
+y = bump(y, GAP.md);
 
 // Línea 3: Fecha
 doc.setFont(labelFont, 'bold');
 doc.text(data.idioma === 'en' ? 'Date:' : 'Fecha:', M_LEFT, y);
 doc.setFont(valueFont, 'normal');
 doc.text(data.fecha, M_LEFT + 40, y);
-y = bump(y, GAP.md);
+y = bump(y, GAP.lg);
 
 
   /*const lineaUsuario1 =
@@ -617,7 +616,7 @@ y = bump(y, GAP.md);
     );
     doc.setFont('helvetica','bold'); doc.setFontSize(10);
     y = drawParagraph(doc, totalLinea, M_LEFT, y, 520, 'helvetica', 'bold', 10, 12, 8);
-    y = bump(y, GAP.sm);
+    y = bump(y, GAP.xs);
 
 
 
