@@ -47,7 +47,7 @@ function drawResultsTable(doc, {lang, x, y, w}, rows){
   // Encabezado
   doc.setFillColor(240,240,240);
   doc.rect(x, y, w, HROW, 'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(9);
+  doc.setFont('helvetica','bold'); doc.setFontSize(11);
 
   const H = (t)=> (lang==='en'?t.en:t.es);
   const HEADS = [
@@ -62,7 +62,7 @@ function drawResultsTable(doc, {lang, x, y, w}, rows){
   y += HROW;
 
   // Filas
-  doc.setFont('helvetica','normal');
+  doc.setFont('helvetica','normal'); doc.setFontSize(11);
   rows.forEach(r=>{
     // líneas divisorias
     doc.setDrawColor(230); doc.line(x, y, x+w, y);
@@ -96,7 +96,7 @@ function drawResultsTable(doc, {lang, x, y, w}, rows){
 }
 
 // --- Espaciados estándar (pt)
-const GAP = { xs: 6, sm: 10, md: 16, lg: 24, xl: 32 };
+const GAP = { xs: 8, sm: 12, md: 18, lg: 28, xl: 40 };
 function bump(y, a = GAP.md){ return y + a; }
 
 
@@ -374,7 +374,7 @@ async function generarPDFyDescargar(data){
     M_LEFT,
     y
   );
- y = bump(y, GAP.lg);
+ y = bump(y, GAP.xl);
 
 
   // Bloque de datos del usuario/empresa
@@ -406,6 +406,7 @@ doc.text(data.idioma === 'en' ? 'Country:' : 'País:', M_LEFT + 220, y);
 doc.setFont(valueFont, 'normal');
 doc.text(data.pais || '', M_LEFT + 260, y);
 y += 14;
+y = bump(y, GAP.sm); 
 
 // Línea 3: Fecha
 doc.setFont(labelFont, 'bold');
@@ -441,12 +442,12 @@ y = bump(y, GAP.md);
   const frase = (data.idioma === 'en')
     ? 'We cannot impose regeneration; we can only create the conditions for it to emerge.'
     : 'No podemos imponer la regeneración, solo podemos crear las condiciones para que emerja.';
-  y = drawParagraph(doc, `"${frase}"`, M_LEFT, y, 520, "helvetica", "italic", 9.5, 12, 2);
+  y = drawParagraph(doc, `"${frase}"`, M_LEFT, y, 520, "helvetica", "italic", 9.5, 12, 0);
   
   doc.setFont('helvetica','normal');
   doc.setFontSize(11);
   doc.text('Regenesis Group', M_LEFT, y + 8);
-  y = bump(y, GAP.lg);
+  y = bump(y, GAP.xl);
 
 
   // Bloque estado general
@@ -458,18 +459,17 @@ y = bump(y, GAP.md);
       : 'Nivel general organizacional',
     M_LEFT, y
   );
-  y = bump(y, GAP.md);
+  y = bump(y, GAP.lg);
 
 
-  // 👇 Fuerza font normal antes del insight
-  doc.setFont('helvetica','normal');
+  
 
   // Insight / lectura humana
     doc.setFont('helvetica','normal');
     doc.setFontSize(11); // antes era 9
     const insight = data.insightNivel || '';
     const insightLines = splitLines(doc, insight, 520);
-    y = drawParagraph(doc, insight, M_LEFT, y, 520, 'helvetica', 'normal', 11, 16, GAP.md);
+    y = drawParagraph(doc, insight, M_LEFT, y, 520, 'helvetica', 'normal', 11, 16, GAP.sm);
 
 
 
@@ -510,7 +510,7 @@ y = bump(y, GAP.md);
     costoTotalStr: data.costoTotalUSD,
     recTotalNum
     });
-   y = bump(y, GAP.md);
+   y = bump(y, GAP.xs);
 
 
 
