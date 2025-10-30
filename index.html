@@ -131,6 +131,108 @@ function fmtMoney(n, lang){
   catch{ return '$' + Math.round(+n||0) + ' ' + CONFIG_ROI.currency; }
 }
 
+// === Interpretaciones KPI (ES/EN) ===
+function interpretNivel(nivel, lang){
+  const m = {
+    es:{ crisis:'Riesgo muy alto (clima y foco estratégico)', desconectado:'Riesgo alto (tensión cultural)', transicion:'Riesgo medio (oportunidad de alineación)', regenerativa:'Riesgo bajo (consolidar hábitos)' },
+    en:{ crisis:'Very high risk (climate & strategic focus)', disconnected:'High risk (cultural tension)', intransition:'Medium risk (alignment opportunity)', regenerative:'Low risk (consolidate habits)' }
+  };
+  const k = (nivel||'').toLowerCase();
+  if (k.includes('crisis'))        return m[lang].crisis;
+  if (k.includes('desconect')||k.includes('disconnect')) return m[lang].desconectado;
+  if (k.includes('trans'))         return m[lang].transicion;
+  return m[lang].regenerativa;
+}
+function interpretCosto(totalNum, lang){
+  // Umbrales orientativos; ajusta si usas otra moneda
+  if (totalNum >= 100000) return (lang==='en'?'High annual leakage':'Fuga anual alta');
+  if (totalNum >= 50000)  return (lang==='en'?'Moderate–high leakage':'Fuga moderada–alta');
+  if (totalNum > 0)       return (lang==='en'?'Moderate leakage':'Fuga moderada');
+  return (lang==='en'?'No leakage':'Sin fuga');
+}
+function interpretROI(recNum, lang){
+  if (recNum <= 0) return (lang==='en'?'No recoverable potential detected':'Sin potencial recuperable detectado');
+  return (lang==='en'
+    ? 'Recoverable in ~12–18 months if prioritized'
+    : 'Recuperable en ~12–18 meses si se prioriza');
+}
+
+
+// === Interpretaciones KPI (ES/EN) ===
+function interpretNivel(nivel, lang){
+  const m = {
+    es:{ crisis:'Riesgo muy alto (clima y foco estratégico)', desconectado:'Riesgo alto (tensión cultural)', transicion:'Riesgo medio (oportunidad de alineación)', regenerativa:'Riesgo bajo (consolidar hábitos)' },
+    en:{ crisis:'Very high risk (climate & strategic focus)', disconnected:'High risk (cultural tension)', intransition:'Medium risk (alignment opportunity)', regenerative:'Low risk (consolidate habits)' }
+  };
+  const k = (nivel||'').toLowerCase();
+  if (k.includes('crisis'))        return m[lang].crisis;
+  if (k.includes('desconect')||k.includes('disconnect')) return m[lang].desconectado;
+  if (k.includes('trans'))         return m[lang].transicion;
+  return m[lang].regenerativa;
+}
+function interpretCosto(totalNum, lang){
+  // Umbrales orientativos; ajusta si usas otra moneda
+  if (totalNum >= 100000) return (lang==='en'?'High annual leakage':'Fuga anual alta');
+  if (totalNum >= 50000)  return (lang==='en'?'Moderate–high leakage':'Fuga moderada–alta');
+  if (totalNum > 0)       return (lang==='en'?'Moderate leakage':'Fuga moderada');
+  return (lang==='en'?'No leakage':'Sin fuga');
+}
+function interpretROI(recNum, lang){
+  if (recNum <= 0) return (lang==='en'?'No recoverable potential detected':'Sin potencial recuperable detectado');
+  return (lang==='en'
+    ? 'Recoverable in ~12–18 months if prioritized'
+    : 'Recuperable en ~12–18 meses si se prioriza');
+}
+
+// === Bloque “Resumen ejecutivo” (tabla 3 columnas) ===
+function drawExecutiveSummary(doc, {x, y, w, lang, nivelGeneral, costoTotalStr, recTotalNum}){
+  const HROW = 20, PAD = 8;
+  const cols = [ w*0.30, w*0.28, w*0.42 ]; // Indicador | Valor | Interpretación
+  const y0 = y;
+
+  // Encabezado
+  doc.setFillColor(240,240,240);
+  doc.roundedRect(x, y, w, HROW, 6, 6, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(10);
+  const HEADS = (lang==='en'
+    ? ['Indicator','Value','Interpretation']
+    : ['Indicador','Valor','Interpretación']);
+  let cx = x + PAD, cy = y + 13;
+  HEADS.forEach((h,i)=>{ doc.text(h, cx, cy); cx += cols[i]; });
+  y += HROW;
+
+  // Filas
+  const costoNum = moneyToNumber(costoTotalStr);
+  const filas = [
+    [(lang==='en'?'General level':'Nivel general'), nivelGeneral, interpretNivel(nivelGeneral, lang)],
+    [(lang==='en'?'Total hidden cost':'Costo oculto total'), costoTotalStr, interpretCosto(costoNum, lang)],
+    [(lang==='en'?'Recoverable (potential)':'Recuperable (potencial)'), fmtMoney(recTotalNum, lang), interpretROI(recTotalNum, lang)],
+  ];
+
+  doc.setFont('helvetica','normal');
+  filas.forEach((row, idx)=>{
+    // líneas divisorias sutiles
+    doc.setDrawColor(230); doc.line(x, y, x+w, y);
+    let tx = x + PAD, ty = y + 13;
+    // Col 1
+    doc.setFont('helvetica','bold'); doc.text(row[0], tx, ty);
+    // Col 2
+    tx += cols[0]; doc.setFont('helvetica','normal'); doc.text(row[1], tx, ty);
+    // Col 3 (wrap)
+    tx += cols[1];
+    const wrap = doc.splitTextToSize(String(row[2]), cols[2]-PAD);
+    doc.text(wrap, tx, ty);
+    const h = Math.max(HROW, 14 * wrap.length + 6);
+    y += h;
+  });
+
+  // Marco final
+  doc.setDrawColor(200); doc.roundedRect(x, y0, w, y - y0, 6, 6);
+  return y + 14; // nuevo cursor
+}
+
+
+
 // === Párrafos con buen interlineado/espaciado ===
 
 function drawParagraph(doc, text, x, y, maxW, font='helvetica', style='normal', size=10.5, lineH=14, spaceAfter=10)
@@ -193,6 +295,10 @@ window.addEventListener('message', async (event) => {
   }
 });
 
+
+
+
+
 async function generarPDFyDescargar(data){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({
@@ -223,7 +329,13 @@ async function generarPDFyDescargar(data){
     M_LEFT,
     y
   );
-  y += 18;
+  y += 15;
+
+  // Subtítulo institucional
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(12);
+    doc.text('Innovación Regenerativa', M_LEFT, y);
+    y += 10;
 
   // Subtítulo
   doc.setFontSize(12);
@@ -243,7 +355,43 @@ async function generarPDFyDescargar(data){
   y += 21;
 
   // Bloque de datos del usuario/empresa
-  const lineaUsuario1 =
+
+doc.setFontSize(10.5); // un poco más grande
+const labelFont = 'helvetica';
+const valueFont = 'helvetica';
+
+// Línea 1: Nombre + Empresa
+doc.setFont(labelFont, 'bold');
+doc.text(data.idioma === 'en' ? 'Name:' : 'Nombre:', M_LEFT, y);
+doc.setFont(valueFont, 'normal');
+doc.text(`${data.nombre} ${data.apellido}`, M_LEFT + 55, y);
+
+doc.setFont(labelFont, 'bold');
+doc.text(data.idioma === 'en' ? 'Organization:' : 'Empresa:', M_LEFT + 220, y);
+doc.setFont(valueFont, 'normal');
+doc.text(data.empresa, M_LEFT + 300, y);
+y += 14;
+
+// Línea 2: Puesto + País
+doc.setFont(labelFont, 'bold');
+doc.text(data.idioma === 'en' ? 'Role:' : 'Puesto:', M_LEFT, y);
+doc.setFont(valueFont, 'normal');
+doc.text(data.puesto, M_LEFT + 45, y);
+
+doc.setFont(labelFont, 'bold');
+doc.text(data.idioma === 'en' ? 'Country:' : 'País:', M_LEFT + 220, y);
+doc.setFont(valueFont, 'normal');
+doc.text(data.pais || '', M_LEFT + 260, y);
+y += 14;
+
+// Línea 3: Fecha
+doc.setFont(labelFont, 'bold');
+doc.text(data.idioma === 'en' ? 'Date:' : 'Fecha:', M_LEFT, y);
+doc.setFont(valueFont, 'normal');
+doc.text(data.fecha, M_LEFT + 40, y);
+y += 16;
+
+  /*const lineaUsuario1 =
     (data.idioma === 'en'
       ? `Name: ${data.nombre} ${data.apellido}  |  Organization: ${data.empresa}`
       : `Nombre: ${data.nombre} ${data.apellido}  |  Empresa: ${data.empresa}`);
@@ -261,7 +409,7 @@ async function generarPDFyDescargar(data){
   doc.setFontSize(11);
   y = drawParagraph(doc, lineaUsuario1, M_LEFT, y, 520, "helvetica", "normal", 9);
   y = drawParagraph(doc, lineaUsuario2, M_LEFT, y, 520, "helvetica", "normal", 9);
-  y = drawParagraph(doc, lineaUsuario3, M_LEFT, y, 520, "helvetica", "normal", 9);
+  y = drawParagraph(doc, lineaUsuario3, M_LEFT, y, 520, "helvetica", "normal", 9);*/
 
   // Frase inspiradora
   doc.setFont('helvetica','italic');
@@ -269,11 +417,11 @@ async function generarPDFyDescargar(data){
   const frase = (data.idioma === 'en')
     ? 'We cannot impose regeneration; we can only create the conditions for it to emerge.'
     : 'No podemos imponer la regeneración, solo podemos crear las condiciones para que emerja.';
-  y = drawParagraph(doc, `"${frase}"`, M_LEFT, y, 520, "helvetica", "italic", 9);
-  y+=5;
+  y = drawParagraph(doc, `"${frase}"`, M_LEFT, y, 520, "helvetica", "italic", 9.5, 12, 2);
+  
   doc.setFont('helvetica','normal');
   doc.setFontSize(11);
-  y = drawParagraph(doc, "Regenesis Group", M_LEFT, y, 520, "helvetica", "normal", 8);
+  doc.text('Regenesis Group', M_LEFT, y + 8);
   y += 6;
 
   // Bloque estado general
@@ -291,11 +439,12 @@ async function generarPDFyDescargar(data){
   doc.setFont('helvetica','normal');
 
   // Insight / lectura humana
-  doc.setFontSize(11);
-  const insight = data.insightNivel || '';
-  const insightLines = splitLines(doc, insight, 520);
-  doc.text(insightLines, M_LEFT, y);
-  y += insightLines.length * 12 + 10;
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(10.5); // antes era 9
+    const insight = data.insightNivel || '';
+    const insightLines = splitLines(doc, insight, 520);
+    doc.text(insightLines, M_LEFT, y);
+    y += insightLines.length * 14 + 10; // un poco más de espacio
 
 
     // ---- Caja gris de MÉTRICAS (Promedio, Nivel, Costo total, ROI/Recuperable) ----
@@ -313,6 +462,30 @@ async function generarPDFyDescargar(data){
     const rate  = recRateFromScore(avg);
     recuperableTotalN += Math.round(costN * rate);
     });
+
+// ===== Resumen ejecutivo con interpretación (antes de "Nivel general organizacional") =====
+
+// Recuperable total (mismo cálculo que usas después)
+    let recTotalNum = 0;
+    (data.areasDetalle || []).forEach(a=>{
+    const avg  = Number(a.promedio || 0);
+    const cost = moneyToNumber(a.costoUSD);
+    recTotalNum += Math.round(cost * recRateFromScore(avg));
+    });
+
+    // Dibuja el bloque
+    y = drawExecutiveSummary(doc, {
+    x: M_LEFT - 4,
+    y,
+    w: 520,
+    lang,
+    nivelGeneral: data.nivelGeneral,
+    costoTotalStr: data.costoTotalUSD,
+    recTotalNum
+    });
+    y += 10; 
+
+
 
     // Parámetros de caja
     const NUM_ROWS = 4;
@@ -354,81 +527,7 @@ async function generarPDFyDescargar(data){
     // Avanza el cursor por debajo de la caja
     y += BOX_H + 20;
 
-    // Calculamos el recuperable total con la misma lógica que por fila:
-    /*let recuperableTotalN = 0;
-    (data.areasDetalle || []).forEach(a => {
-    const avg = Number(a.promedio || 0);
-    const costN = moneyToNumber(a.costoUSD);
-    const rate  = recRateFromScore(avg);      // usa tu helper existente
-    recuperableTotalN += Math.round(costN * rate);
-    });
-
-    // Caja
-    const BOX_W = 520;
-    const BOX_H = 64;          // alto fijo para 4 líneas
-    doc.setFillColor(245,245,245);
-    doc.roundedRect(M_LEFT-4, y, BOX_W, BOX_H, 4, 4, 'F');
-
-    /*doc.setFont('helvetica','bold'); doc.setFontSize(10.5);
-    doc.text(
-    lang==='en' ? 'Summary (key indicators)' : 'Resumen (indicadores clave)',
-    M_LEFT, y + 14
-    );*/
-
-    /*doc.setFont('helvetica','normal'); doc.setFontSize(10);
-
-    // columnas (label : value)
-function drawKV(lbl, val, row, yOffset){
-  const yy = y + yOffset + row*14;
-  doc.setFont('helvetica','bold');   
-  doc.text(lbl, M_LEFT, yy);
-  doc.setFont('helvetica','normal'); 
-  doc.text(val, M_LEFT + 160, yy);
-}
-
-// === Centrado vertical ===
-// Altura total de las 4 líneas
-const numRows = 4;
-const lineSpacing = 14;
-const totalTextHeight = numRows * lineSpacing;
-
-// Calcula espacio libre arriba para centrar
-const startOffset = (BOX_H - totalTextHeight) / 2 + 10;  // +10 da un pequeño margen superior visual
-
-    // Línea 1: Promedio general
-    drawKV(
-    lang==='en' ? 'Overall score:' : 'Promedio general:',
-    `${data.promedioGeneral} / 5`,
-    1,
-    startOffset
-    );
-
-    // Línea 2: Nivel general
-    drawKV(
-    lang==='en' ? 'General level:' : 'Nivel general:',
-    `${data.nivelGeneral}`,
-    2,
-    startOffset
-    );
-
-    // Línea 3: Costo oculto total
-    drawKV(
-    lang==='en' ? 'Total hidden cost:' : 'Costo oculto total:',
-    `${data.costoTotalUSD}`,
-    3,
-    startOffset
-    );
-
-    // Línea 4: ROI (recuperable potencial)
-    drawKV(
-    'ROI',
-    fmtMoney(recuperableTotalN, lang),     // sólo dinero recuperable, sin “≥5x”
-    4,
-    startOffset
-    );
-
-    y += BOX_H + 16;
-    y += 24;*/
+   
 
     const recoLabel = (data.idioma === 'en') ? 'Key recommendation:' : 'Recomendación clave:';
     const recoBody  = (data.idioma === 'en')
