@@ -226,7 +226,7 @@ async function generarPDFyDescargar(data){
   y += 18;
 
   // Subtítulo
-  doc.setFontSize(10);
+  doc.setFontSize(12);
   doc.setFont('helvetica','normal');
   y += 4;
    doc.text(
@@ -240,7 +240,7 @@ async function generarPDFyDescargar(data){
     M_LEFT,
     y
   );
-  y += 28;
+  y += 21;
 
   // Bloque de datos del usuario/empresa
   const lineaUsuario1 =
@@ -258,27 +258,27 @@ async function generarPDFyDescargar(data){
       ? `Date: ${data.fecha}`
       : `Fecha: ${data.fecha}`);
 
-  doc.setFontSize(9);
+  doc.setFontSize(11);
   y = drawParagraph(doc, lineaUsuario1, M_LEFT, y, 520, "helvetica", "normal", 9);
   y = drawParagraph(doc, lineaUsuario2, M_LEFT, y, 520, "helvetica", "normal", 9);
   y = drawParagraph(doc, lineaUsuario3, M_LEFT, y, 520, "helvetica", "normal", 9);
 
   // Frase inspiradora
   doc.setFont('helvetica','italic');
-  doc.setFontSize(9);
+  doc.setFontSize(12);
   const frase = (data.idioma === 'en')
     ? 'We cannot impose regeneration; we can only create the conditions for it to emerge.'
     : 'No podemos imponer la regeneración, solo podemos crear las condiciones para que emerja.';
   y = drawParagraph(doc, `"${frase}"`, M_LEFT, y, 520, "helvetica", "italic", 9);
   y+=5;
   doc.setFont('helvetica','normal');
-  doc.setFontSize(8);
+  doc.setFontSize(11);
   y = drawParagraph(doc, "Regenesis Group", M_LEFT, y, 520, "helvetica", "normal", 8);
   y += 6;
 
   // Bloque estado general
   doc.setFont('helvetica','bold');
-  doc.setFontSize(11);
+  doc.setFontSize(12);
   doc.text(
     data.idioma === 'en'
       ? 'Organizational status'
@@ -291,7 +291,7 @@ async function generarPDFyDescargar(data){
   doc.setFont('helvetica','normal');
 
   // Insight / lectura humana
-  doc.setFontSize(9);
+  doc.setFontSize(11);
   const insight = data.insightNivel || '';
   const insightLines = splitLines(doc, insight, 520);
   doc.text(insightLines, M_LEFT, y);
