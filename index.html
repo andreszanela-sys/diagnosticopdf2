@@ -70,7 +70,8 @@ function limpiarHTML(htmlString){
 // === Párrafos con buen interlineado/espaciado ===
 function drawParagraph(doc, text, x, y, maxW, font='helvetica', style='normal', size=11, lineH=16, spaceAfter=12){
   doc.setFont(font, style); doc.setFontSize(size);
-  const lines = doc.splitTextToSize(String(text||''), maxW);
+  const raw = Array.isArray(text) ? text.filter(v=>v!=null).map(String).join('\n') : String(text||'');
+  const lines = doc.splitTextToSize(raw, maxW || 520);
   doc.text(lines, x, y);
   return y + lines.length*lineH + spaceAfter;
 }
@@ -389,20 +390,24 @@ if (!ok) throw new Error('Instancia inválida de jsPDF: faltan métodos base');
 
   doc.setFont('helvetica','normal');
   doc.setFontSize(9);
-  y = drawParagraph(
-    [
-      (data.idioma==='en'
-        ? `Overall score: ${data.promedioGeneral} / 5`
-        : `Promedio general: ${data.promedioGeneral} / 5`
-      ),
-      (data.idioma==='en'
-        ? `General level: ${data.nivelGeneral}`
-        : `Nivel general: ${data.nivelGeneral}`
-      )
-    ],
-    M_LEFT,
-    y
-  );
+ y = drawParagraph(
+  doc,
+  [
+    (data.idioma==='en'
+      ? `Overall score: ${data.promedioGeneral} / 5`
+      : `Promedio general: ${data.promedioGeneral} / 5`
+    ),
+    (data.idioma==='en'
+      ? `General level: ${data.nivelGeneral}`
+      : `Nivel general: ${data.nivelGeneral}`
+    )
+  ],
+  M_LEFT,
+  y,
+  520,               // <- maxW
+  'helvetica','normal',9, 16, 12
+);
+
   y += 20;
 
   doc.setFillColor(245,245,245);
