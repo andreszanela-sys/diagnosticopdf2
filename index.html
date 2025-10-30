@@ -305,8 +305,57 @@ async function generarPDFyDescargar(data){
     const NOMBRES_ES = { proposito:'Propósito y estrategia', liderazgo:'Liderazgo y gobernanza', cultura:'Cultura y bienestar', aprendizaje:'Aprendizaje e innovación', procesos:'Procesos y tecnología', sostenibilidad:'Sostenibilidad e impacto' };
     const NOMBRES_EN = { proposito:'Purpose & Strategy', leadership:'Leadership & Governance', cultura:'Culture & Wellbeing', aprendizaje:'Learning & Innovation', procesos:'Processes & Technology', sostenibilidad:'Sustainability & Impact' };
 
-    // Calculamos el recuperable total con la misma lógica que por fila:
+    // Calcula recuperable total (ya lo tenías)
     let recuperableTotalN = 0;
+    (data.areasDetalle || []).forEach(a => {
+    const avg = Number(a.promedio || 0);
+    const costN = moneyToNumber(a.costoUSD);
+    const rate  = recRateFromScore(avg);
+    recuperableTotalN += Math.round(costN * rate);
+    });
+
+    // Parámetros de caja
+    const NUM_ROWS = 4;
+    const ROW_H = 14;          // alto por renglón (coincide con tu interlínea)
+    const PAD_Y = 12;          // padding vertical
+    const PAD_X = 12;          // padding horizontal
+    const BOX_X = M_LEFT - 4;  // un pelín a la izquierda para redondeo
+    const BOX_W = 520;
+    const CONTENT_H = NUM_ROWS * ROW_H;
+    const BOX_H = PAD_Y * 2 + CONTENT_H;     // ← altura dinámica
+
+    // Dibuja la caja
+    doc.setFillColor(245,245,245);
+    doc.setDrawColor(230);        // borde sutil (opcional)
+    doc.setLineWidth(0.6);
+    doc.roundedRect(BOX_X, y, BOX_W, BOX_H, 6, 6, 'FD'); // 'FD' = Fill + Draw
+
+    // Tipografía de las líneas
+    doc.setFontSize(10);
+    const baseX = BOX_X + PAD_X;
+    const valX  = baseX + 170;    // columna de valores
+    let baseY   = y + PAD_Y + 10; // primera línea dentro de la caja
+
+    function drawKV(lbl, val, row){
+    const lineY = baseY + row * ROW_H;
+    doc.setFont('helvetica','bold');   doc.text(lbl, baseX, lineY);
+    doc.setFont('helvetica','normal'); doc.text(val,  valX,  lineY);
+    }
+
+    // 1) Promedio
+    drawKV(lang==='en' ? 'Overall score:' : 'Promedio general:', `${data.promedioGeneral} / 5`, 0);
+    // 2) Nivel
+    drawKV(lang==='en' ? 'General level:' : 'Nivel general:', `${data.nivelGeneral}`, 1);
+    // 3) Costo total
+    drawKV(lang==='en' ? 'Total hidden cost:' : 'Costo oculto total:', `${data.costoTotalUSD}`, 2);
+    // 4) ROI (recuperable potencial)
+    drawKV('ROI', fmtMoney(recuperableTotalN, lang), 3);
+
+    // Avanza el cursor por debajo de la caja
+    y += BOX_H + 20;
+
+    // Calculamos el recuperable total con la misma lógica que por fila:
+    /*let recuperableTotalN = 0;
     (data.areasDetalle || []).forEach(a => {
     const avg = Number(a.promedio || 0);
     const costN = moneyToNumber(a.costoUSD);
@@ -326,7 +375,7 @@ async function generarPDFyDescargar(data){
     M_LEFT, y + 14
     );*/
 
-    doc.setFont('helvetica','normal'); doc.setFontSize(10);
+    /*doc.setFont('helvetica','normal'); doc.setFontSize(10);
 
     // columnas (label : value)
 function drawKV(lbl, val, row, yOffset){
@@ -379,7 +428,7 @@ const startOffset = (BOX_H - totalTextHeight) / 2 + 10;  // +10 da un pequeño m
     );
 
     y += BOX_H + 16;
-    y += 24;
+    y += 24;*/
 
     const recoLabel = (data.idioma === 'en') ? 'Key recommendation:' : 'Recomendación clave:';
     const recoBody  = (data.idioma === 'en')
