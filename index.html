@@ -68,10 +68,20 @@ function limpiarHTML(htmlString){
 }
 
 // === Párrafos con buen interlineado/espaciado ===
-function drawParagraph(doc, text, x, y, maxW, font='helvetica', style='normal', size=11, lineH=16, spaceAfter=12){
-  doc.setFont(font, style); doc.setFontSize(size);
-  const lines = doc.splitTextToSize(String(text||''), maxW);
+function drawParagraph(
+  doc, text, x, y, maxW,
+  font='helvetica', style='normal', size=11, lineH=16, spaceAfter=12
+){
+  doc.setFont(font, style);
+  doc.setFontSize(size);
+  const raw = Array.isArray(text) ? text.filter(v=>v!=null).map(String).join('\n') : String(text || '');
+  const width = (typeof maxW === 'number' && maxW > 0) ? maxW : 520;   // valor por defecto
+  if (typeof x !== 'number' || typeof y !== 'number') {
+    throw new Error('drawParagraph: x/y inválidos');
+  }
+  const lines = doc.splitTextToSize(raw, width);
   doc.text(lines, x, y);
+  return y + lines.length * lineH + spaceAfter;  // <<--- este return faltaba
 }
 
 function drawResultsTable(doc, {lang, x, y, w}, rows){
