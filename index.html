@@ -240,11 +240,11 @@ async function generarPDFyDescargar(data){
     ? 'We cannot impose regeneration; we can only create the conditions for it to emerge.'
     : 'No podemos imponer la regeneración, solo podemos crear las condiciones para que emerja.';
   y = drawParagraph(doc, `"${frase}"`, M_LEFT, y, 520, "helvetica", "italic", 9);
-  y+=12;
+  y+=8;
   doc.setFont('helvetica','normal');
   doc.setFontSize(8);
   y = drawParagraph(doc, "Regenesis Group", M_LEFT, y, 520, "helvetica", "normal", 8);
-  y += 24;
+  y += 14;
 
   // Bloque estado general
   doc.setFont('helvetica','bold');
@@ -289,11 +289,11 @@ async function generarPDFyDescargar(data){
     doc.setFillColor(245,245,245);
     doc.roundedRect(M_LEFT-4, y, BOX_W, BOX_H, 4, 4, 'F');
 
-    doc.setFont('helvetica','bold'); doc.setFontSize(10.5);
+    /*doc.setFont('helvetica','bold'); doc.setFontSize(10.5);
     doc.text(
     lang==='en' ? 'Summary (key indicators)' : 'Resumen (indicadores clave)',
     M_LEFT, y + 14
-    );
+    );*/
 
     doc.setFont('helvetica','normal'); doc.setFontSize(10);
 
@@ -333,6 +333,7 @@ async function generarPDFyDescargar(data){
     );
 
     y += BOX_H + 16;
+    y += 14;
 
     const recoText = (
     data.idioma === 'en'
