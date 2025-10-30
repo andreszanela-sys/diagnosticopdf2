@@ -257,23 +257,7 @@ async function generarPDFyDescargar(data){
   );
   y+=14;
 
-  doc.setFont('helvetica','normal');
-  doc.setFontSize(9);
-  doc.text(
-    [
-      (data.idioma==='en'
-        ? `Overall score: ${data.promedioGeneral} / 5`
-        : `Promedio general: ${data.promedioGeneral} / 5`
-      ),
-      (data.idioma==='en'
-        ? `General level: ${data.nivelGeneral}`
-        : `Nivel general: ${data.nivelGeneral}`
-      )
-    ],
-    M_LEFT,
-    y
-  );
-  y += 24;
+
 
   // Insight / lectura humana
   doc.setFontSize(9);
@@ -282,21 +266,84 @@ async function generarPDFyDescargar(data){
   doc.text(insightLines, M_LEFT, y);
   y += insightLines.length * 12 + 10;
 
-  // Caja de recomendación clave (simulamos fondo gris claro)
-  const cajaText = (
+
+    // ---- Caja gris de MÉTRICAS (Promedio, Nivel, Costo total, ROI/Recuperable) ----
+    const lang = data.idioma === 'en' ? 'en' : 'es';
+
+    // Si aún no tienes “rows” construidas aquí, calcula el recuperable total a partir de las áreas:
+    const NOMBRES_ES = { proposito:'Propósito y estrategia', liderazgo:'Liderazgo y gobernanza', cultura:'Cultura y bienestar', aprendizaje:'Aprendizaje e innovación', procesos:'Procesos y tecnología', sostenibilidad:'Sostenibilidad e impacto' };
+    const NOMBRES_EN = { proposito:'Purpose & Strategy', leadership:'Leadership & Governance', cultura:'Culture & Wellbeing', aprendizaje:'Learning & Innovation', procesos:'Processes & Technology', sostenibilidad:'Sustainability & Impact' };
+
+    // Calculamos el recuperable total con la misma lógica que por fila:
+    let recuperableTotalN = 0;
+    (data.areasDetalle || []).forEach(a => {
+    const avg = Number(a.promedio || 0);
+    const costN = moneyToNumber(a.costoUSD);
+    const rate  = recRateFromScore(avg);      // usa tu helper existente
+    recuperableTotalN += Math.round(costN * rate);
+    });
+
+    // Caja
+    const BOX_W = 520;
+    const BOX_H = 64;          // alto fijo para 4 líneas
+    doc.setFillColor(245,245,245);
+    doc.roundedRect(M_LEFT-4, y, BOX_W, BOX_H, 4, 4, 'F');
+
+    doc.setFont('helvetica','bold'); doc.setFontSize(10.5);
+    doc.text(
+    lang==='en' ? 'Summary (key indicators)' : 'Resumen (indicadores clave)',
+    M_LEFT, y + 14
+    );
+
+    doc.setFont('helvetica','normal'); doc.setFontSize(10);
+
+    // columnas (label : value)
+    function drawKV(lbl, val, row){
+    const yy = y + 14 + row*14;
+    doc.setFont('helvetica','bold');   doc.text(lbl, M_LEFT, yy+10);
+    doc.setFont('helvetica','normal'); doc.text(val, M_LEFT + 160, yy+10);
+    }
+
+    // Línea 1: Promedio general
+    drawKV(
+    lang==='en' ? 'Overall score:' : 'Promedio general:',
+    `${data.promedioGeneral} / 5`,
+    1
+    );
+
+    // Línea 2: Nivel general
+    drawKV(
+    lang==='en' ? 'General level:' : 'Nivel general:',
+    `${data.nivelGeneral}`,
+    2
+    );
+
+    // Línea 3: Costo oculto total
+    drawKV(
+    lang==='en' ? 'Total hidden cost:' : 'Costo oculto total:',
+    `${data.costoTotalUSD}`,
+    3
+    );
+
+    // Línea 4: ROI (recuperable potencial)
+    drawKV(
+    'ROI',
+    fmtMoney(recuperableTotalN, lang),     // sólo dinero recuperable, sin “≥5x”
+    4
+    );
+
+    y += BOX_H + 16;
+
+    const recoText = (
     data.idioma === 'en'
-    ? 'Key recommendation: Focus leadership attention on the 2–3 lowest scoring areas and link fixes to strategic purpose. Disconnection is expensive – and reversible.'
-    : 'Recomendación clave: Poner en agenda de liderazgo las 2–3 áreas con menor puntaje y vincular su mejora al propósito estratégico. La desconexión es costosa, pero reversible.'
-  );
-  // dibujar rectángulo gris claro
-  doc.setFillColor(245,245,245);
-  const cajaLines = splitLines(doc, cajaText, 500);
-  const cajaH = cajaLines.length * 12 + 16;
-  doc.rect(M_LEFT-4, y, 520, cajaH, 'F'); // relleno
-  doc.setFont('helvetica','bold');
-  doc.setTextColor(0,0,0);
-  doc.text(cajaLines, M_LEFT, y+14);
-  y += cajaH + 20;
+        ? 'Key recommendation: Focus leadership attention on the 2–3 lowest scoring areas and link fixes to strategic purpose. Disconnection is expensive — and reversible.'
+        : 'Recomendación clave: Poner en agenda de liderazgo las 2–3 áreas con menor puntaje y vincular su mejora al propósito estratégico. La desconexión es costosa, pero reversible.'
+    );
+
+    doc.setFont('helvetica','bold'); doc.setFontSize(10);
+    y = drawParagraph(doc, recoText, M_LEFT, y, 520, 'helvetica', 'bold', 10, 12, 10);
+
+  
 
   // Tabla resumen por dimensión
   doc.setFont('helvetica','bold');
@@ -311,24 +358,7 @@ async function generarPDFyDescargar(data){
   y += 14;
 
   // ===== Construcción de filas para la tabla (usa data.areasDetalle ya enviado desde Velo) =====
-    const NOMBRES_ES = {
-    proposito:'Propósito y estrategia',
-    liderazgo:'Liderazgo y gobernanza',
-    cultura:'Cultura y bienestar',
-    aprendizaje:'Aprendizaje e innovación',
-    procesos:'Procesos y tecnología',
-    sostenibilidad:'Sostenibilidad e impacto'
-    };
-    const NOMBRES_EN = {
-    proposito:'Purpose & Strategy',
-    liderazgo:'Leadership & Governance',
-    cultura:'Culture & Wellbeing',
-    aprendizaje:'Learning & Innovation',
-    procesos:'Processes & Technology',
-    sostenibilidad:'Sustainability & Impact'
-    };
-
-    const lang = data.idioma === 'en' ? 'en' : 'es';
+   
 
     // Normalizamos filas con ROI
     const rows = (data.areasDetalle || []).map(a => {
@@ -344,7 +374,7 @@ async function generarPDFyDescargar(data){
         name: label,
         avg: avg.toFixed(1),
         costStr: fmtMoney(costN, lang),                // "$16,800 USD"
-        roiStr: `${fmtMoney(rec, lang)}  ≥${CONFIG_ROI.roiMultipleMin}x`
+        roiStr: fmtMoney(rec, lang)    // solo el monto recuperable potencial
         // si prefieres explicitar inversión: `${fmtMoney(rec, lang)} (inv. ~${fmtMoney(inv, lang)} → ≥${CONFIG_ROI.roiMultipleMin}x)`
     };
     });
@@ -360,6 +390,15 @@ async function generarPDFyDescargar(data){
     );
     doc.setFont('helvetica','bold'); doc.setFontSize(10);
     y = drawParagraph(doc, totalLinea, M_LEFT, y, 520, 'helvetica', 'bold', 10, 12, 8);
+
+
+    const recLinea = (
+    lang==='en'
+        ? `Recoverable (potential): ${fmtMoney(recuperableTotalN, lang)}.`
+        : `Recuperable (potencial): ${fmtMoney(recuperableTotalN, lang)}.`
+    );
+    doc.setFont('helvetica','bold'); doc.setFontSize(10);
+    y = drawParagraph(doc, recLinea, M_LEFT, y, 520, 'helvetica', 'bold', 10, 12, 8);
 
 
   // Footer de página
