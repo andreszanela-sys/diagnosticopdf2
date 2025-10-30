@@ -240,11 +240,11 @@ async function generarPDFyDescargar(data){
     ? 'We cannot impose regeneration; we can only create the conditions for it to emerge.'
     : 'No podemos imponer la regeneración, solo podemos crear las condiciones para que emerja.';
   y = drawParagraph(doc, `"${frase}"`, M_LEFT, y, 520, "helvetica", "italic", 9);
-  y+=8;
+  y+=5;
   doc.setFont('helvetica','normal');
   doc.setFontSize(8);
   y = drawParagraph(doc, "Regenesis Group", M_LEFT, y, 520, "helvetica", "normal", 8);
-  y += 14;
+  y += 6;
 
   // Bloque estado general
   doc.setFont('helvetica','bold');
@@ -300,8 +300,8 @@ async function generarPDFyDescargar(data){
     // columnas (label : value)
     function drawKV(lbl, val, row){
     const yy = y + 14 + row*14;
-    doc.setFont('helvetica','bold');   doc.text(lbl, M_LEFT, yy+10);
-    doc.setFont('helvetica','normal'); doc.text(val, M_LEFT + 160, yy+10);
+    doc.setFont('helvetica','bold');   doc.text(lbl, M_LEFT, yy+1);
+    doc.setFont('helvetica','normal'); doc.text(val, M_LEFT + 160, yy+1);
     }
 
     // Línea 1: Promedio general
@@ -333,7 +333,7 @@ async function generarPDFyDescargar(data){
     );
 
     y += BOX_H + 16;
-    y += 14;
+    y += 24;
 
     const recoText = (
     data.idioma === 'en'
