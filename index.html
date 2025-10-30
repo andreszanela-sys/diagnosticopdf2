@@ -161,8 +161,14 @@ function interpretROI(recNum, lang){
 // === Interpretaciones KPI (ES/EN) ===
 function interpretNivel(nivel, lang){
   const m = {
-    es:{ crisis:'Riesgo muy alto (clima y foco estratégico)', desconectado:'Riesgo alto (tensión cultural)', transicion:'Riesgo medio (oportunidad de alineación)', regenerativa:'Riesgo bajo (consolidar hábitos)' },
-    en:{ crisis:'Very high risk (climate & strategic focus)', disconnected:'High risk (cultural tension)', intransition:'Medium risk (alignment opportunity)', regenerative:'Low risk (consolidate habits)' }
+    es:{ crisis:'Riesgo muy alto (clima y foco estratégico)',
+         desconectado:'Riesgo alto (tensión cultural)',
+         transicion:'Riesgo medio (oportunidad de alineación)',
+         regenerativa:'Riesgo bajo (consolidar hábitos)' },
+    en:{ crisis:'Very high risk (climate & strategic focus)',
+         desconectado:'High risk (cultural tension)',
+         transicion:'Medium risk (alignment opportunity)',
+         regenerativa:'Low risk (consolidate habits)' }
   };
   const k = (nivel||'').toLowerCase();
   if (k.includes('crisis'))        return m[lang].crisis;
@@ -170,13 +176,22 @@ function interpretNivel(nivel, lang){
   if (k.includes('trans'))         return m[lang].transicion;
   return m[lang].regenerativa;
 }
+
+function interpretPromedio(prom, lang){
+  const p = Number(prom||0);
+  if (p <= 2.0) return (lang==='en'?'High disconnection — immediate containment':'Desconexión alta — contención inmediata');
+  if (p <= 3.0) return (lang==='en'?'Medium disconnection — prioritize 2–3 areas':'Desconexión media — priorizar 2–3 áreas');
+  if (p <= 4.0) return (lang==='en'?'Moderate connection — consolidate key habits':'Conexión moderada — consolidar hábitos clave');
+  return (lang==='en'?'Solid connection — maintain cadence & metrics':'Conexión sólida — mantener cadencia y métricas');
+}
+
 function interpretCosto(totalNum, lang){
-  // Umbrales orientativos; ajusta si usas otra moneda
   if (totalNum >= 100000) return (lang==='en'?'High annual leakage':'Fuga anual alta');
   if (totalNum >= 50000)  return (lang==='en'?'Moderate–high leakage':'Fuga moderada–alta');
   if (totalNum > 0)       return (lang==='en'?'Moderate leakage':'Fuga moderada');
   return (lang==='en'?'No leakage':'Sin fuga');
 }
+
 function interpretROI(recNum, lang){
   if (recNum <= 0) return (lang==='en'?'No recoverable potential detected':'Sin potencial recuperable detectado');
   return (lang==='en'
@@ -184,41 +199,40 @@ function interpretROI(recNum, lang){
     : 'Recuperable en ~12–18 meses si se prioriza');
 }
 
-// === Bloque “Resumen ejecutivo” (tabla 3 columnas) ===
-function drawExecutiveSummary(doc, {x, y, w, lang, nivelGeneral, costoTotalStr, recTotalNum}){
+// === Bloque “Resumen ejecutivo” (Indicador | Valor | Interpretación) ===
+function drawExecutiveSummary(doc, {x, y, w, lang, nivelGeneral, promedioGeneral, costoTotalStr, recTotalNum}){
   const HROW = 20, PAD = 8;
-  const cols = [ w*0.30, w*0.28, w*0.42 ]; // Indicador | Valor | Interpretación
+  const cols = [ w*0.30, w*0.28, w*0.42 ];
   const y0 = y;
 
   // Encabezado
   doc.setFillColor(240,240,240);
   doc.roundedRect(x, y, w, HROW, 6, 6, 'F');
   doc.setFont('helvetica','bold'); doc.setFontSize(10);
-  const HEADS = (lang==='en'
-    ? ['Indicator','Value','Interpretation']
-    : ['Indicador','Valor','Interpretación']);
+  const HEADS = (lang==='en' ? ['Indicator','Value','Interpretation']
+                              : ['Indicador','Valor','Interpretación']);
   let cx = x + PAD, cy = y + 13;
   HEADS.forEach((h,i)=>{ doc.text(h, cx, cy); cx += cols[i]; });
   y += HROW;
 
-  // Filas
+  // Datos
   const costoNum = moneyToNumber(costoTotalStr);
   const filas = [
     [(lang==='en'?'General level':'Nivel general'), nivelGeneral, interpretNivel(nivelGeneral, lang)],
+    [(lang==='en'?'Overall score':'Promedio general'), `${Number(promedioGeneral||0).toFixed(2)} / 5`, interpretPromedio(promedioGeneral, lang)],
     [(lang==='en'?'Total hidden cost':'Costo oculto total'), costoTotalStr, interpretCosto(costoNum, lang)],
     [(lang==='en'?'Recoverable (potential)':'Recuperable (potencial)'), fmtMoney(recTotalNum, lang), interpretROI(recTotalNum, lang)],
   ];
 
-  doc.setFont('helvetica','normal');
-  filas.forEach((row, idx)=>{
-    // líneas divisorias sutiles
+  // Filas
+  filas.forEach(row=>{
     doc.setDrawColor(230); doc.line(x, y, x+w, y);
+    // col 1 (label)
     let tx = x + PAD, ty = y + 13;
-    // Col 1
-    doc.setFont('helvetica','bold'); doc.text(row[0], tx, ty);
-    // Col 2
+    doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.text(row[0], tx, ty);
+    // col 2 (valor)
     tx += cols[0]; doc.setFont('helvetica','normal'); doc.text(row[1], tx, ty);
-    // Col 3 (wrap)
+    // col 3 (interpretación wrap)
     tx += cols[1];
     const wrap = doc.splitTextToSize(String(row[2]), cols[2]-PAD);
     doc.text(wrap, tx, ty);
@@ -226,10 +240,11 @@ function drawExecutiveSummary(doc, {x, y, w, lang, nivelGeneral, costoTotalStr, 
     y += h;
   });
 
-  // Marco final
+  // Marco
   doc.setDrawColor(200); doc.roundedRect(x, y0, w, y - y0, 6, 6);
-  return y + 14; // nuevo cursor
+  return y + 14;
 }
+
 
 
 
@@ -422,7 +437,7 @@ y += 16;
   doc.setFont('helvetica','normal');
   doc.setFontSize(11);
   doc.text('Regenesis Group', M_LEFT, y + 8);
-  y += 6;
+  y += 20;
 
   // Bloque estado general
   doc.setFont('helvetica','bold');
@@ -440,7 +455,7 @@ y += 16;
 
   // Insight / lectura humana
     doc.setFont('helvetica','normal');
-    doc.setFontSize(10.5); // antes era 9
+    doc.setFontSize(11); // antes era 9
     const insight = data.insightNivel || '';
     const insightLines = splitLines(doc, insight, 520);
     doc.text(insightLines, M_LEFT, y);
@@ -478,8 +493,9 @@ y += 16;
     x: M_LEFT - 4,
     y,
     w: 520,
-    lang,
+    lang: (data.idioma === 'en' ? 'en' : 'es'),
     nivelGeneral: data.nivelGeneral,
+    promedioGeneral: data.promedioGeneral,   // <<—— NUEVO
     costoTotalStr: data.costoTotalUSD,
     recTotalNum
     });
@@ -488,7 +504,7 @@ y += 16;
 
 
     // Parámetros de caja
-    const NUM_ROWS = 4;
+    /*const NUM_ROWS = 4;
     const ROW_H = 14;          // alto por renglón (coincide con tu interlínea)
     const PAD_Y = 12;          // padding vertical
     const PAD_X = 12;          // padding horizontal
@@ -525,7 +541,7 @@ y += 16;
     drawKV('ROI', fmtMoney(recuperableTotalN, lang), 3);
 
     // Avanza el cursor por debajo de la caja
-    y += BOX_H + 20;
+    y += BOX_H + 20;*/
 
    
 
