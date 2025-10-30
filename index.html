@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<title>Generador PDF</title>
+<!-- jsPDF (puede ser la versión que ya usabas) -->
+<script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+<style>
+  /* opcional: estilos internos si quieres previsualizar algo */
+ body{font-family: "Open Sans", Arial, sans-serif; font-size:12px; color:#000;}
+</style>
+</head>
+<body>
+
+<script>
+
+    // === CONFIG ROI (idéntico a Velo) ===
+const CONFIG_ROI = {
+  recRates: { crisis: 0.70, desconectado: 0.60, transicion: 0.45, regenerativa: 0.30 },
+  roiMultipleMin: 5,           // "≥5x"
+  horizonte: '12–18 meses',
+  currency: 'USD'
+};
+
+// === Traducción de puntaje → etiqueta de nivel (igual que en Velo) ===
+function nivelConexionTexto(p, l) {
+  if (p <= 2.0) return l==='en' ? 'In crisis'     : 'En crisis';
+  if (p <= 3.0) return l==='en' ? 'Disconnected'  : 'Desconectado';
+  if (p <= 4.0) return l==='en' ? 'In transition' : 'En transición';
+  return               l==='en' ? 'Regenerative'  : 'Regenerativa';
+}
+
+// === Ratio recuperable desde score (misma lógica que recRateFromScore de Velo) ===
+function recRateFromScore(score){
+  if (score <= 2.0) return CONFIG_ROI.recRates.crisis;
+  if (score <= 3.0) return CONFIG_ROI.recRates.desconectado;
+  if (score <= 4.0) return CONFIG_ROI.recRates.transicion;
+  return              CONFIG_ROI.recRates.regenerativa;
+}
+
+// === Helpers de formato/parseo seguros ===
+function moneyToNumber(s){
+  // "$16,800 USD" -> 16800
+  if (s == null) return 0;
+  const n = String(s).replace(/[^\d.,-]/g,'').replace(/,/g,'');
+  return Number(n || 0);
+}
+function fmtMoney(n, lang){
+  try { return '$' + Math.round(+n||0).toLocaleString(lang==='en'?'en-US':'es-MX') + ' ' + CONFIG_ROI.currency; }
+  catch{ return '$' + Math.round(+n||0) + ' ' + CONFIG_ROI.currency; }
+}
+
+function splitLines(doc, text, maxWidth){
+  if (!text) return [''];
+  // jsPDF 2.5: splitTextToSize
+  return doc.splitTextToSize(String(text), maxWidth);
+}
+
+function limpiarHTML(htmlString){
+  if (!htmlString) return '';
+  return String(htmlString)
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+// === Párrafos con buen interlineado/espaciado ===
+function drawParagraph(doc, text, x, y, maxW, font='helvetica', style='normal', size=11, lineH=16, spaceAfter=12){
+  doc.setFont(font, style); doc.setFontSize(size);
+  const lines = doc.splitTextToSize(String(text||''), maxW);
+  doc.text(lines, x, y);
+  return y + lines.length*lineH + spaceAfter;
+}
+
+function drawResultsTable(doc, {lang, x, y, w}, rows){
+  const colW = [ w*0.46, w*0.14, w*0.22, w*0.18 ];
+  const HROW = 18;
+  const y0   = y;
+
+  doc.setFillColor(240,240,240);
+  doc.rect(x, y, w, HROW, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9);
+  const H = (t)=> (lang==='en'?t.en:t.es);
+  const HEADS = [
+    H({es:'Dimensión', en:'Dimension'}),
+    H({es:'Promedio',  en:'Avg'}),
+    H({es:'Costo oculto', en:'Hidden cost'}),
+    H({es:'ROI (potencial)', en:'ROI (potential)'})
+  ];
+  let cx = x + 6, cy = y + 12;
+  HEADS.forEach((h, i)=>{ doc.text(String(h), cx, cy); cx += colW[i]; });
+  y += HROW;
+
+  doc.setFont('helvetica','normal');
+  rows.forEach(r=>{
+    doc.setDrawColor(230); doc.line(x, y, x+w, y);
+    let tx = x + 6, ty = y + 12;
+
+    const nameLines = doc.splitTextToSize(r.name, colW[0]-12);
+    doc.text(nameLines, tx, ty);
+    const h1 = Math.max(HROW, nameLines.length*12+6);
+
+    tx = x + colW[0] + 6; doc.text(`${r.avg} / 5`, tx, ty);
+
+    const costX = x + colW[0] + colW[1] + colW[2] - 6;
+    doc.text(r.costStr, costX, ty, { align: 'right' });
+
+    const roiX = x + w - 6;
+    doc.text(r.roiStr, roiX, ty, { align: 'right' });
+
+    y += Math.max(h1, HROW);
+  });
+
+  doc.setDrawColor(200); doc.rect(x, y0, w, y - y0);
+  return y + 10;
+}
+
+// Genera nombre de archivo final
+function generarNombreArchivo(data){
+  const nom   = (data.nombre  || '').trim().replace(/\s+/g,'_');
+  const emp   = (data.empresa || '').trim().replace(/\s+/g,'_');
+  const fecha = (data.fecha   || '').replace(/[^\d-]/g,'_');
+  return `Diagnostico_${nom}_${emp}_${fecha}.pdf`;
+}
+
+/* ========= Descarga “a prueba de bloqueadores” ========= */
+function descargarComoBlobUrl(doc, filename){
+  try {
+    const blobUrl = doc.output('bloburl');
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename || 'informe.pdf';
+    // asegura el “gesto” de usuario: insert y click inmediato
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=> {
+      URL.revokeObjectURL(blobUrl);
+      a.remove();
+    }, 1000);
+    return true;
+  } catch(e){
+    console.warn('Fallo bloburl, voy con doc.save', e);
+    doc.save(filename || 'informe.pdf');
+    return false;
+  }
+}
+
+/* ========= Espera a que jsPDF esté disponible ========= */
+function waitForJsPDF(maxMs = 5000){
+  return new Promise((resolve, reject)=>{
+    const t0 = Date.now();
+    (function spin(){
+      // UMD correcto: window.jspdf.jsPDF
+      if (window.jspdf && typeof window.jspdf.jsPDF === 'function') {
+        return resolve(window.jspdf); // devolvemos el *namespace* completo
+      }
+      if (Date.now() - t0 > maxMs) {
+        return reject(new Error('jsPDF no disponible (UMD)'));
+      }
+      setTimeout(spin, 50);
+    })();
+  });
+}
+
+
+
+
+// ====== Helpers de formato / espaciado ======
+const LHF = 1.35;                       // line-height factor global
+const P_SP = 8;                         // espacio entre párrafos (pt)
+
+
+function drawLabelValue(doc, label, value, x, y, wLabel=110, size=9) {
+  doc.setFont("helvetica", "bold");  doc.setFontSize(size);
+  doc.text(label, x, y);
+  doc.setFont("helvetica", "normal");
+  doc.text(value, x + wLabel, y);
+  return y + size * LHF;
+}
+
+function fmtAvg(v){ return (v!=null && !isNaN(v)) ? `${Number(v).toFixed(1)} / 5` : "-"; }
+function fmtROI(v){
+  if (v===null || v===undefined || v==="") return "-";
+  const num = Number(v);
+  if (Number.isNaN(num)) return String(v);
+  return `${(num*100).toFixed(0)}%`;
+}
+
+// ====== Tabla Resultados por dimensión (4 columnas) ======
+// ================= TABLA CON ROI =================
+/*function drawResultsTable(doc, {lang, x, y, w}, rows){
+  // Dimensión | Promedio | Costo oculto | ROI
+  const colW = [ w*0.46, w*0.14, w*0.22, w*0.18 ];
+  const HROW = 18;
+  const y0   = y;
+
+  // Encabezado
+  doc.setFillColor(240,240,240);
+  doc.rect(x, y, w, HROW, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9);
+  const H = (t)=> (lang==='en'?t.en:t.es);
+  const HEADS = [
+    H({es:'Dimensión', en:'Dimension'}),
+    H({es:'Promedio',  en:'Avg'}),
+    H({es:'Costo oculto', en:'Hidden cost'}),
+    H({es:'ROI (potencial)', en:'ROI (potential)'})
+  ];
+
+  let cx = x + 6, cy = y + 12;
+  HEADS.forEach((h, i)=>{ doc.text(String(h), cx, cy); cx += colW[i]; });
+  y += HROW;
+
+  // Filas
+  doc.setFont('helvetica','normal');
+  rows.forEach(r=>{
+    doc.setDrawColor(230); doc.line(x, y, x+w, y);
+    let tx = x + 6, ty = y + 12;
+
+    // 1) Dimensión (wrap)
+    const nameLines = doc.splitTextToSize(r.name, colW[0]-12);
+    doc.text(nameLines, tx, ty);
+    const h1 = Math.max(HROW, nameLines.length*12+6);
+
+    // 2) Promedio (alineado izq simple)
+    tx = x + colW[0] + 6;
+    doc.text(`${r.avg} / 5`, tx, ty);
+
+    // 3) Costo (alineado a la derecha)
+    const costX = x + colW[0] + colW[1] + colW[2] - 6;
+    doc.text(r.costStr, costX, ty, { align: 'right' });
+
+    // 4) ROI (ASCII: ">=5x", alineado derecha)
+    const roiX = x + w - 6;
+    doc.text(r.roiStr, roiX, ty, { align: 'right' });
+
+    y += Math.max(h1, HROW);
+  });
+
+  doc.setDrawColor(200); doc.rect(x, y0, w, y - y0);
+  return y + 10;
+}*/
+
+
+
+
+
+
+
+// 2. Escuchar datos desde Wix
+window.addEventListener('message', async (event) => {
+  const data = event.data;
+  if (!data) return;
+
+  // ignorar mensajes tipo "ready" que tú mismo mandas
+  if (data.type === 'ready') return;
+
+  // sólo reaccionar a data válidos del diagnóstico
+  if (data.type === 'datosInforme') {
+    await generarPDFyDescargar(data);
+
+    // Avisar de éxito de generación a Wix
+    window.parent.postMessage({ type:'pdf-ok' }, '*');
+  }
+});
+
+// 1. Avisar a Wix "ya estoy listo"
+window.parent.postMessage({ type: 'ready' }, "*");
+
+async function generarPDFyDescargar(data){
+  await waitForJsPDF();                           // garantiza carga del UMD
+  const JS = window.jspdf && window.jspdf.jsPDF;  // constructor real
+  if (typeof JS !== 'function') {
+    throw new Error('jsPDF no disponible (constructor ausente)');
+  }
+
+  const doc = new JS({ unit: 'pt', format: 'letter' });
+
+// sanity checks duros
+const ok = (
+  doc &&
+  typeof doc.addPage === 'function' &&
+  typeof doc.text === 'function' &&
+  typeof doc.setFont === 'function'
+);
+console.log('jsPDF sanity:', {
+  isObject: !!doc, addPage: typeof doc.addPage, text: typeof doc.text, setFont: typeof doc.setFont
+});
+if (!ok) throw new Error('Instancia inválida de jsPDF: faltan métodos base');
+
+  /*const jspdfNS = await waitForJsPDF(); 
+  const { jsPDF } = jspdfNS; 
+    //const jsPDF = await waitForJsPDF();
+  //const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({
+    unit: 'pt',   // puntos
+    format: 'letter' // o 'a4', según tu pdf original
+  });*/
+
+  // Margenes básicos
+  const M_LEFT = 40;
+  const M_TOP  = 40;
+  let y = M_TOP;
+
+  // ============ PORTADA / PÁGINA 1 ============
+
+  // Branding arriba derecha
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(8);
+  doc.text('Innovación Regenerativa | Informe diagnóstico', 400, y);
+  y += 20;
+
+  // Título
+  doc.setFontSize(16);
+  doc.setFont('helvetica','bold');
+  doc.text(
+    data.idioma === 'en'
+      ? 'ORGANIZATIONAL DIAGNOSTIC REPORT'
+      : 'INFORME DIAGNÓSTICO ORGANIZACIONAL',
+    M_LEFT,
+    y
+  );
+  y += 18;
+
+  // Subtítulo
+  doc.setFontSize(10);
+  doc.setFont('helvetica','normal');
+  y += 4;
+   doc.text(
+    splitLines(
+      doc,
+      data.idioma === 'en'
+        ? 'A starting point to align purpose, energy, and outcomes in your organization'
+        : 'Un punto de partida para alinear propósito, energía y resultados en tu organización',
+      520
+    ),
+    M_LEFT,
+    y
+  );
+  y += 28;
+
+  // Bloque de datos del usuario/empresa
+  doc.setFontSize(9);
+  const lineaUsuario1 =
+    (data.idioma === 'en'
+      ? `Name: ${data.nombre} ${data.apellido}  |  Organization: ${data.empresa}`
+      : `Nombre: ${data.nombre} ${data.apellido}  |  Empresa: ${data.empresa}`);
+
+  const lineaUsuario2 =
+    (data.idioma === 'en'
+      ? `Role: ${data.puesto}  |  Country: ${data.pais}`
+      : `Puesto: ${data.puesto}  |  País: ${data.pais}`);
+
+  const lineaUsuario3 =
+    (data.idioma === 'en'
+      ? `Date: ${data.fecha}`
+      : `Fecha: ${data.fecha}`);
+
+  doc.setFontSize(9);
+  y = drawParagraph(doc, lineaUsuario1, M_LEFT, y, 520, "helvetica", "normal", 9);
+  y = drawParagraph(doc, lineaUsuario2, M_LEFT, y, 520, "helvetica", "normal", 9);
+  y = drawParagraph(doc, lineaUsuario3, M_LEFT, y, 520, "helvetica", "normal", 9);
+
+  // Frase inspiradora
+  doc.setFont('helvetica','italic');
+  doc.setFontSize(9);
+  const frase = (data.idioma === 'en')
+    ? 'We cannot impose regeneration; we can only create the conditions for it to emerge.'
+    : 'No podemos imponer la regeneración, solo podemos crear las condiciones para que emerja.';
+  y = drawParagraph(doc, `"${frase}"`, M_LEFT, y, 520, "helvetica", "italic", 9);
+  y+=10;
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(8);
+  y = drawParagraph(doc, "Regenesis Group", M_LEFT, y, 520, "helvetica", "normal", 8);
+  y += 20;
+
+  // Bloque estado general
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(11);
+  doc.text(
+    data.idioma === 'en'
+      ? 'Organizational status'
+      : 'Nivel general organizacional',
+    M_LEFT, y
+  );
+  y+=14;
+
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(9);
+  y = drawParagraph(
+    [
+      (data.idioma==='en'
+        ? `Overall score: ${data.promedioGeneral} / 5`
+        : `Promedio general: ${data.promedioGeneral} / 5`
+      ),
+      (data.idioma==='en'
+        ? `General level: ${data.nivelGeneral}`
+        : `Nivel general: ${data.nivelGeneral}`
+      )
+    ],
+    M_LEFT,
+    y
+  );
+  y += 20;
+
+  doc.setFillColor(245,245,245);
+  const boxW = 520, boxX = M_LEFT-4, linesBox = [
+    (data.idioma==='en' ? 'Snapshot' : 'Resumen'),
+    (data.idioma==='en' ? `Overall score: ${data.promedioGeneral} / 5` : `Promedio general: ${data.promedioGeneral} / 5`),
+    (data.idioma==='en' ? `General level: ${data.nivelGeneral}` : `Nivel general: ${data.nivelGeneral}`),
+    (data.idioma==='en' ? `Estimated hidden cost: ${data.costoTotalUSD} per year` : `Costo oculto estimado: ${data.costoTotalUSD} al año`)
+  ];
+
+  // Insight / lectura humana
+  /*doc.setFontSize(9);
+  const insight = data.insightNivel || '';
+  const insightLines = splitLines(doc, insight, 520);
+  doc.text(insightLines, M_LEFT, y);
+  y += insightLines.length * 12 + 10;
+
+  // Caja de recomendación clave (simulamos fondo gris claro)
+  // Caja de métricas clave (fondo gris)
+    const cajaTitulo = (data.idioma==='en' ? 'Snapshot' : 'Resumen');
+    const cajaLine1  = (data.idioma==='en'
+    ? `Overall score: ${data.promedioGeneral} / 5`
+    : `Promedio general: ${data.promedioGeneral} / 5`);
+    const cajaLine2  = (data.idioma==='en'
+    ? `General level: ${data.nivelGeneral}`
+    : `Nivel general: ${data.nivelGeneral}`);
+    const cajaLine3  = (data.idioma==='en'
+    ? `Estimated hidden cost: ${data.costoTotalUSD} per year`
+    : `Costo oculto estimado: ${data.costoTotalUSD} al año`);
+
+    doc.setFillColor(245,245,245);
+    const boxW = 520;
+    const boxX = M_LEFT-4;
+    const linesBox = [cajaTitulo, cajaLine1, cajaLine2, cajaLine3];*/
+
+    doc.setFont('helvetica','bold'); doc.setFontSize(11);
+    const t1 = doc.splitTextToSize(linesBox[0], boxW-16);
+    let boxH = t1.length*16 + 8;
+
+    doc.setFont('helvetica','normal'); doc.setFontSize(11);
+    const t2 = doc.splitTextToSize(linesBox[1]+'\n'+linesBox[2]+'\n'+linesBox[3], boxW-16);
+    boxH += t2.length*16 + 16;
+
+    doc.rect(boxX, y, boxW, boxH, 'F');
+    let by = y + 14;
+
+    doc.setFont('helvetica','bold'); doc.setFontSize(11);
+    doc.text(t1, M_LEFT, by); by += t1.length*16 + 4;
+
+    doc.setFont('helvetica','normal'); doc.setFontSize(11);
+    doc.text(t2, M_LEFT, by);
+
+    y += boxH + 20;
+
+    // Insight / lectura
+  doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  const insightLines = splitLines(doc, (data.insightNivel || ''), 520);
+  doc.text(insightLines, M_LEFT, y); y += insightLines.length * 12 + 10;
+
+
+  // Tabla resumen por dimensión
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(11);
+  doc.text(
+    data.idioma==='en'
+      ? 'Results by dimension'
+      : 'Resultados por dimensión',
+    M_LEFT,
+    y
+  );
+  y += 14;
+
+  
+
+  // ===== Construcción de filas para la tabla (usa data.areasDetalle ya enviado desde Velo) =====
+    const NOMBRES_ES = {
+    proposito:'Propósito y estrategia',
+    liderazgo:'Liderazgo y gobernanza',
+    cultura:'Cultura y bienestar',
+    aprendizaje:'Aprendizaje e innovación',
+    procesos:'Procesos y tecnología',
+    sostenibilidad:'Sostenibilidad e impacto'
+    };
+    const NOMBRES_EN = {
+    proposito:'Purpose & Strategy',
+    liderazgo:'Leadership & Governance',
+    cultura:'Culture & Wellbeing',
+    aprendizaje:'Learning & Innovation',
+    procesos:'Processes & Technology',
+    sostenibilidad:'Sustainability & Impact'
+    };
+
+    const lang = data.idioma === 'en' ? 'en' : 'es';
+
+    // Normalizamos filas con ROI
+    const rows = (data.areasDetalle || []).map(a => {
+    const label = (lang==='en' ? NOMBRES_EN[a.areaKey] : NOMBRES_ES[a.areaKey]) || a.areaKey;
+    const avg   = Number(a.promedio || 0);
+    const costN = moneyToNumber(a.costoUSD);             // número
+    const rate  = recRateFromScore(avg);                 // 0.70 / 0.60 / 0.45 / 0.30
+    const rec   = Math.round(costN * rate);              // recuperable potencial
+    const inv   = Math.max(1, Math.round(rec / (CONFIG_ROI.roiMultipleMin||5))); // inversión estimada p/≥5x
+    //const roiX  = (rec>0 && inv>0) ? (rec/inv) : CONFIG_ROI.roiMultipleMin;
+
+    return {
+        name: label,
+        avg: avg.toFixed(1),
+        costStr: fmtMoney(costN, lang),                // "$16,800 USD"
+        roiStr: `${fmtMoney(rec, lang)}  >=${CONFIG_ROI.roiMultipleMin}x`
+        // si prefieres explicitar inversión: `${fmtMoney(rec, lang)} (inv. ~${fmtMoney(inv, lang)} → ≥${CONFIG_ROI.roiMultipleMin}x)`
+    };
+    });
+
+    // Dibujar tabla
+    y = drawResultsTable(doc, { lang, x: M_LEFT, y, w: 520 }, rows);
+
+    doc.setFont('helvetica','bold'); doc.setFontSize(10);
+     y = drawParagraph(
+      lang==='en'
+      ? `Estimated hidden cost: ${data.costoTotalUSD} per year.`
+      : `Costo oculto estimado: ${data.costoTotalUSD} al año.`,
+      M_LEFT, y, 520, 'helvetica','bold', 10, 12, 8
+    );
+
+    // Línea “Costo oculto estimado” (abajo de la tabla)
+    /*const totalLinea = (
+    lang==='en'
+        ? `Estimated hidden cost: ${data.costoTotalUSD} per year.`
+        : `Costo oculto estimado: ${data.costoTotalUSD} al año.`
+    );
+    doc.setFont('helvetica','bold'); doc.setFontSize(10);
+    y = drawParagraph(doc, totalLinea, M_LEFT, y, 520, 'helvetica', 'bold', 10, 12, 8);*/
+
+
+  // Footer de página
+  const pageH = doc.internal.pageSize.getHeight();  // obtiene la altura total del PDF
+    doc.setFontSize(8);
+    doc.setFont('helvetica','normal');
+    doc.text(
+    data.idioma==='en' ? 'Page 1' : 'Página 1',
+    520,           // posición X (derecha)
+    pageH - 32     // posición Y (32pt desde el borde inferior)
+    );
+
+  // ============ PÁGINA 2: Retos / Fortalezas / Acciones clave ============
+  doc.addPage();
+  y = M_TOP;
+
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(12);
+  doc.text(
+    data.idioma==='en'
+      ? 'Priority tensions and opportunities'
+      : 'Tensiones prioritarias y oportunidades',
+    M_LEFT, y
+  );
+  y+=20;
+
+  // El campo analisisNivel es la narrativa larga que tú armaste (parts.htmlFull),
+  // que incluye retos prioritarios, fortalezas, % de costo, recomendación.
+  // Lo vamos a volcar aquí como texto multilinea:
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(9);
+  const analisisLines = splitLines(doc, limpiarHTML(data.analisisNivel), 520);
+  // Vamos dibujando línea por línea y saltando de página si se llena
+  for (let i=0; i<analisisLines.length; i++){
+    if (y > 760){
+      doc.addPage();
+      y = M_TOP;
+      doc.setFont('helvetica','normal');
+      doc.setFontSize(9);
+    }
+    doc.text(analisisLines[i], M_LEFT, y);
+    y+=12;
+  }
+
+  // descarga
+  const fileName = generarNombreArchivo(data);
+
+// Opción A: data URL (más simple y suficiente)
+const dataUrl = doc.output('datauristring'); // "data:application/pdf;base64,..."
+window.parent.postMessage({ type: 'pdf-dataurl', fileName, dataUrl }, '*');
+}
+
+</script>
+</body>
+</html>
