@@ -141,6 +141,36 @@ function drawParagraph(doc, text, x, y, maxW, font='helvetica', style='normal', 
   return y + lines.length*lineH + spaceAfter;
 }
 
+// Helper: etiqueta en bold + texto normal con salto de línea correcto
+function drawBoldLabelThenText(doc, label, text, x, y, maxW, gap = 6, size = 10, lineH = 12) {
+  doc.setFont('helvetica','bold');  doc.setFontSize(size);
+  const labelW = doc.getTextWidth(label);
+
+  // Si la etiqueta cabe y deja espacio para texto en la misma línea
+  const firstLineW = Math.max(0, maxW - labelW - gap);
+
+  // Partimos el texto normal para la primera línea (resto va abajo)
+  doc.setFont('helvetica','normal');
+  const firstSlice = doc.splitTextToSize(text, firstLineW);
+  const firstLineText = firstSlice.shift() || '';
+
+  // Dibuja etiqueta + primer pedazo en la misma línea
+  doc.setFont('helvetica','bold');
+  doc.text(label, x, y);
+  doc.setFont('helvetica','normal');
+  doc.text(firstLineText, x + labelW + gap, y);
+
+  // Dibuja el resto del texto, línea por línea, debajo
+  let yy = y + lineH;
+  firstSlice.forEach(line => {
+    doc.text(line, x, yy);
+    yy += lineH;
+  });
+
+  return yy; // devuelve el siguiente y disponible
+}
+
+
 
 
 // 1. Avisar a Wix "ya estoy listo"
@@ -257,7 +287,8 @@ async function generarPDFyDescargar(data){
   );
   y+=14;
 
-
+  // 👇 Fuerza font normal antes del insight
+  doc.setFont('helvetica','normal');
 
   // Insight / lectura humana
   doc.setFontSize(9);
@@ -298,51 +329,68 @@ async function generarPDFyDescargar(data){
     doc.setFont('helvetica','normal'); doc.setFontSize(10);
 
     // columnas (label : value)
-    function drawKV(lbl, val, row){
-    const yy = y + 14 + row*14;
-    doc.setFont('helvetica','bold');   doc.text(lbl, M_LEFT, yy+1);
-    doc.setFont('helvetica','normal'); doc.text(val, M_LEFT + 160, yy+1);
-    }
+function drawKV(lbl, val, row, yOffset){
+  const yy = y + yOffset + row*14;
+  doc.setFont('helvetica','bold');   
+  doc.text(lbl, M_LEFT, yy);
+  doc.setFont('helvetica','normal'); 
+  doc.text(val, M_LEFT + 160, yy);
+}
+
+// === Centrado vertical ===
+// Altura total de las 4 líneas
+const numRows = 4;
+const lineSpacing = 14;
+const totalTextHeight = numRows * lineSpacing;
+
+// Calcula espacio libre arriba para centrar
+const startOffset = (BOX_H - totalTextHeight) / 2 + 10;  // +10 da un pequeño margen superior visual
 
     // Línea 1: Promedio general
     drawKV(
     lang==='en' ? 'Overall score:' : 'Promedio general:',
     `${data.promedioGeneral} / 5`,
-    1
+    1,
+    startOffset
     );
 
     // Línea 2: Nivel general
     drawKV(
     lang==='en' ? 'General level:' : 'Nivel general:',
     `${data.nivelGeneral}`,
-    2
+    2,
+    startOffset
     );
 
     // Línea 3: Costo oculto total
     drawKV(
     lang==='en' ? 'Total hidden cost:' : 'Costo oculto total:',
     `${data.costoTotalUSD}`,
-    3
+    3,
+    startOffset
     );
 
     // Línea 4: ROI (recuperable potencial)
     drawKV(
     'ROI',
     fmtMoney(recuperableTotalN, lang),     // sólo dinero recuperable, sin “≥5x”
-    4
+    4,
+    startOffset
     );
 
     y += BOX_H + 16;
     y += 24;
 
-    const recoText = (
-    data.idioma === 'en'
-        ? 'Key recommendation: Focus leadership attention on the 2–3 lowest scoring areas and link fixes to strategic purpose. Disconnection is expensive — and reversible.'
-        : 'Recomendación clave: Poner en agenda de liderazgo las 2–3 áreas con menor puntaje y vincular su mejora al propósito estratégico. La desconexión es costosa, pero reversible.'
-    );
+    const recoLabel = (data.idioma === 'en') ? 'Key recommendation:' : 'Recomendación clave:';
+    const recoBody  = (data.idioma === 'en')
+    ? ' Focus leadership attention on the 2–3 lowest scoring areas and link fixes to strategic purpose. Disconnection is expensive — and reversible.'
+    : ' Poner en agenda de liderazgo las 2–3 áreas con menor puntaje y vincular su mejora al propósito estratégico. La desconexión es costosa, pero reversible.';
 
-    doc.setFont('helvetica','bold'); doc.setFontSize(10);
-    y = drawParagraph(doc, recoText, M_LEFT, y, 520, 'helvetica', 'bold', 10, 12, 10);
+    // Título “Recomendación” no hace falta; imprime directamente la línea compuesta:
+    doc.setFontSize(10);
+    y = drawBoldLabelThenText(doc, recoLabel, recoBody, M_LEFT, y, 520, 6, 10, 12);
+    y += 10; // espacio después
+
 
   
 
