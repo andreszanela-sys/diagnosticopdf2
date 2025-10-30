@@ -91,8 +91,13 @@ function drawResultsTable(doc, {lang, x, y, w}, rows){
 
   // marco sutil
   doc.setDrawColor(200); doc.rect(x, y0, w, y - y0);
-  return y + 10;
+  return y + GAP.md;
+
 }
+
+// --- Espaciados estándar (pt)
+const GAP = { xs: 6, sm: 10, md: 16, lg: 24, xl: 32 };
+function bump(y, a = GAP.md){ return y + a; }
 
 
 // === CONFIG ROI (idéntico a Velo) ===
@@ -242,7 +247,7 @@ function drawExecutiveSummary(doc, {x, y, w, lang, nivelGeneral, promedioGeneral
 
   // Marco
   doc.setDrawColor(200); doc.roundedRect(x, y0, w, y - y0, 6, 6);
-  return y + 14;
+  return y + GAP.lg;
 }
 
 
@@ -250,13 +255,13 @@ function drawExecutiveSummary(doc, {x, y, w, lang, nivelGeneral, promedioGeneral
 
 // === Párrafos con buen interlineado/espaciado ===
 
-function drawParagraph(doc, text, x, y, maxW, font='helvetica', style='normal', size=10.5, lineH=14, spaceAfter=10)
-{
+function drawParagraph(doc, text, x, y, maxW, font='helvetica', style='normal', size=10.5, lineH=16, spaceAfter=GAP.md){
   doc.setFont(font, style); doc.setFontSize(size);
   const lines = doc.splitTextToSize(String(text||''), maxW);
   doc.text(lines, x, y);
   return y + lines.length*lineH + spaceAfter;
 }
+
 
 // Helper: etiqueta en bold + texto normal con salto de línea correcto
 function drawBoldLabelThenText(doc, label, text, x, y, maxW, gap = 6, size = 10, lineH = 12) {
@@ -332,7 +337,7 @@ async function generarPDFyDescargar(data){
   doc.setFont('helvetica','normal');
   doc.setFontSize(8);
   doc.text('Innovación Regenerativa | Informe diagnóstico', 400, y);
-  y += 20;
+  y = bump(y, GAP.lg);       
 
   // Título
   doc.setFontSize(16);
@@ -344,13 +349,15 @@ async function generarPDFyDescargar(data){
     M_LEFT,
     y
   );
-  y += 15;
+  y = bump(y, GAP.lg);       
+
 
   // Subtítulo institucional
     doc.setFont('helvetica','bold');
     doc.setFontSize(12);
     doc.text('Innovación Regenerativa', M_LEFT, y);
-    y += 10;
+   y = bump(y, GAP.md);       // antes y += 20
+
 
   // Subtítulo
   doc.setFontSize(12);
@@ -367,7 +374,8 @@ async function generarPDFyDescargar(data){
     M_LEFT,
     y
   );
-  y += 21;
+ y = bump(y, GAP.lg);
+
 
   // Bloque de datos del usuario/empresa
 
@@ -404,7 +412,8 @@ doc.setFont(labelFont, 'bold');
 doc.text(data.idioma === 'en' ? 'Date:' : 'Fecha:', M_LEFT, y);
 doc.setFont(valueFont, 'normal');
 doc.text(data.fecha, M_LEFT + 40, y);
-y += 16;
+y = bump(y, GAP.md);
+
 
   /*const lineaUsuario1 =
     (data.idioma === 'en'
@@ -437,7 +446,8 @@ y += 16;
   doc.setFont('helvetica','normal');
   doc.setFontSize(11);
   doc.text('Regenesis Group', M_LEFT, y + 8);
-  y += 20;
+  y = bump(y, GAP.lg);
+
 
   // Bloque estado general
   doc.setFont('helvetica','bold');
@@ -448,7 +458,8 @@ y += 16;
       : 'Nivel general organizacional',
     M_LEFT, y
   );
-  y+=14;
+  y = bump(y, GAP.md);
+
 
   // 👇 Fuerza font normal antes del insight
   doc.setFont('helvetica','normal');
@@ -458,8 +469,8 @@ y += 16;
     doc.setFontSize(11); // antes era 9
     const insight = data.insightNivel || '';
     const insightLines = splitLines(doc, insight, 520);
-    doc.text(insightLines, M_LEFT, y);
-    y += insightLines.length * 14 + 10; // un poco más de espacio
+    y = drawParagraph(doc, insight, M_LEFT, y, 520, 'helvetica', 'normal', 11, 16, GAP.md);
+
 
 
     // ---- Caja gris de MÉTRICAS (Promedio, Nivel, Costo total, ROI/Recuperable) ----
@@ -499,7 +510,8 @@ y += 16;
     costoTotalStr: data.costoTotalUSD,
     recTotalNum
     });
-    y += 10; 
+   y = bump(y, GAP.md);
+
 
 
 
@@ -553,7 +565,8 @@ y += 16;
     // Título “Recomendación” no hace falta; imprime directamente la línea compuesta:
     doc.setFontSize(10);
     y = drawBoldLabelThenText(doc, recoLabel, recoBody, M_LEFT, y, 520, 6, 10, 12);
-    y += 10; // espacio después
+   y = bump(y, GAP.md);
+
 
 
   
@@ -568,7 +581,8 @@ y += 16;
     M_LEFT,
     y
   );
-  y += 14;
+  y = bump(y, GAP.md);
+
 
   // ===== Construcción de filas para la tabla (usa data.areasDetalle ya enviado desde Velo) =====
    
@@ -603,6 +617,8 @@ y += 16;
     );
     doc.setFont('helvetica','bold'); doc.setFontSize(10);
     y = drawParagraph(doc, totalLinea, M_LEFT, y, 520, 'helvetica', 'bold', 10, 12, 8);
+    y = bump(y, GAP.sm);
+
 
 
     const recLinea = (
@@ -612,6 +628,8 @@ y += 16;
     );
     doc.setFont('helvetica','bold'); doc.setFontSize(10);
     y = drawParagraph(doc, recLinea, M_LEFT, y, 520, 'helvetica', 'bold', 10, 12, 8);
+    y = bump(y, GAP.sm);
+
 
 
   // Footer de página
