@@ -70,10 +70,8 @@ function limpiarHTML(htmlString){
 // === Párrafos con buen interlineado/espaciado ===
 function drawParagraph(doc, text, x, y, maxW, font='helvetica', style='normal', size=11, lineH=16, spaceAfter=12){
   doc.setFont(font, style); doc.setFontSize(size);
-  const raw = Array.isArray(text) ? text.filter(v=>v!=null).map(String).join('\n') : String(text||'');
-  const lines = doc.splitTextToSize(raw, maxW || 520);
+  const lines = doc.splitTextToSize(String(text||''), maxW);
   doc.text(lines, x, y);
-  return y + lines.length*lineH + spaceAfter;
 }
 
 function drawResultsTable(doc, {lang, x, y, w}, rows){
@@ -247,8 +245,8 @@ function fmtROI(v){
 
 
 
-
-
+// 1. Avisar a Wix "ya estoy listo"
+window.parent.postMessage({ type: 'ready' }, "*");
 
 // 2. Escuchar datos desde Wix
 window.addEventListener('message', async (event) => {
@@ -267,29 +265,16 @@ window.addEventListener('message', async (event) => {
   }
 });
 
-// 1. Avisar a Wix "ya estoy listo"
-window.parent.postMessage({ type: 'ready' }, "*");
-
 async function generarPDFyDescargar(data){
-  await waitForJsPDF();                           // garantiza carga del UMD
-  const JS = window.jspdf && window.jspdf.jsPDF;  // constructor real
-  if (typeof JS !== 'function') {
-    throw new Error('jsPDF no disponible (constructor ausente)');
-  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({
+    unit: 'pt',   // puntos
+    format: 'letter' // o 'a4', según tu pdf original
+  });
 
-  const doc = new JS({ unit: 'pt', format: 'letter' });
 
-// sanity checks duros
-const ok = (
-  doc &&
-  typeof doc.addPage === 'function' &&
-  typeof doc.text === 'function' &&
-  typeof doc.setFont === 'function'
-);
-console.log('jsPDF sanity:', {
-  isObject: !!doc, addPage: typeof doc.addPage, text: typeof doc.text, setFont: typeof doc.setFont
-});
-if (!ok) throw new Error('Instancia inválida de jsPDF: faltan métodos base');
+  
+
 
   /*const jspdfNS = await waitForJsPDF(); 
   const { jsPDF } = jspdfNS; 
