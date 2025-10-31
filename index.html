@@ -137,7 +137,7 @@ function fmtMoney(n, lang){
 }
 
 // === Interpretaciones KPI (ES/EN) ===
-function interpretNivel(nivel, lang){
+/*function interpretNivel(nivel, lang){
   const m = {
     es:{ crisis:'Riesgo muy alto (clima y foco estratégico)', desconectado:'Riesgo alto (tensión cultural)', transicion:'Riesgo medio (oportunidad de alineación)', regenerativa:'Riesgo bajo (consolidar hábitos)' },
     en:{ crisis:'Very high risk (climate & strategic focus)', disconnected:'High risk (cultural tension)', intransition:'Medium risk (alignment opportunity)', regenerative:'Low risk (consolidate habits)' }
@@ -160,7 +160,7 @@ function interpretROI(recNum, lang){
   return (lang==='en'
     ? 'Recoverable in ~12–18 months if prioritized'
     : 'Recuperable en ~12–18 meses si se prioriza');
-}
+}*/
 
 
 // === Interpretaciones KPI (ES/EN) ===
@@ -251,14 +251,14 @@ function drawExecutiveSummary(doc, {x, y, w, lang, nivelGeneral, promedioGeneral
   return y + GAP.lg;
 }
 
-function hardWrapLongTokens(s, max=28){
+/*function hardWrapLongTokens(s, max=28){
   return String(s).split(/\s/).map(tok=>{
     if (tok.length <= max) return tok;
     const parts=[]; for (let i=0;i<tok.length;i+=max) parts.push(tok.slice(i,i+max)+'-');
     parts[parts.length-1]=parts[parts.length-1].replace(/-$/,''); // quita guion final
     return parts.join(' ');
   }).join(' ');
-}
+}*/
 
 
 
@@ -358,15 +358,19 @@ function drawLongTextPaged(doc, text, x, y, maxW, opts = {}){
   // Partimos en párrafos por línea en blanco
   const paragraphs = String(text).split(/\n\s*\n/);
 
-  for (let p of paragraphs){
-    p = hardWrapLongTokens(p);                         // ⬅️ rompe “palabras” largas
+  for (const p of paragraphs){
     const lines = doc.splitTextToSize(p, maxW);
     for (const line of lines){
-      if (y > yLimit){ doc.addPage(); y = topMargin; doc.setFont(font, style); doc.setFontSize(size); }
+      if (y > yLimit){
+        doc.addPage();
+        y = topMargin;
+        doc.setFont(font, style);
+        doc.setFontSize(size);
+      }
       doc.text(line, x, y);
       y += lineH;
     }
-    y += spaceAfter;                                   // espacio entre párrafos
+    y += spaceAfter; // espacio entre párrafos
   }
   return y;
 }
