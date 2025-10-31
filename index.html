@@ -670,10 +670,7 @@ if (doc.setWordSpace)  doc.setWordSpace(0);  // algunas builds lo exponen
 // (opcional) doc.setGState(new doc.GState({ charSpace: 0, wordSpace: 0 })); // si tu build lo permite
 
 const resumenLimpio = normalizeText( limpiarHTML(data.analisisNivel) );
-y = drawLongTextPaged(doc, resumenLimpio, M_LEFT, y, 520, {
-  font: 'helvetica', style: 'normal', size: 10.5, lineH: 16, spaceAfter: 8,
-  topMargin: M_TOP, bottomMargin: 60
-});
+
 
   doc.setFont('helvetica','bold');
   doc.setFontSize(12);
@@ -684,8 +681,6 @@ y = drawLongTextPaged(doc, resumenLimpio, M_LEFT, y, 520, {
     M_LEFT, y
   );
   y+=20;
-
-
 
     // título ya lo dejaste puesto arriba; ahora el cuerpo:
     y = drawLongTextPaged(doc, resumenLimpio, M_LEFT, y, 520, {
