@@ -295,28 +295,30 @@ function drawBoldLabelThenText(doc, label, text, x, y, maxW, gap = 6, size = 10,
 
 
 // ——— Normaliza el texto que viene del HTML (quita NBSPs y espacios finos) ———
-// Quita NBSP, espacios finos y también "letra espacio letra espacio..."
-function normalizeText(s){
-  if (!s) return '';
-  // 1) limpieza básica
-  let t = String(s)
-    .replace(/[\u00A0\u2000-\u200B]/g, ' ') // NBSP y espacios finos → espacio normal
+// Normaliza NBSP/espacios finos y elimina "kerning falso" línea por línea
+function normalizeText(input){
+  if (!input) return '';
+  let t = String(input)
+    // 1) NBSP y espacios finos → espacio normal
+    .replace(/[\u00A0\u2000-\u200B\u202F]/g, ' ')
+    // 2) colapsa espacios repetidos y limpia saltos
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n[ \t]+/g, '\n')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-  // 2) des-kerning: colapsa secuencias "L e t r a s" → "Letras"
-  //    Toma grupos de (letra + espacio) repetidos y elimina los espacios internos.
-  t = t.replace(/((?:[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]\s){2,}[A-Za-zÁÉÍÓÚÜÑáéíóúüñ])/g,
-                m => m.replace(/\s/g, ''));
+  // 3) De-kerning robusto: si una SUBCADENA luce como "C a d e n a" (≥6 alternancias),
+  //    le quitamos los espacios internos sin tocar el resto de la línea.
+  t = t.replace(/((?:\S\s){6,}\S)/g, (m) => m.replace(/(?<=\S)\s(?=\S)/g, ''));
 
-  // 3) versión con soporte Unicode amplio (por si hay otros caracteres)
-  t = t.replace(/((?:\p{L}\s){2,}\p{L})/gu, m => m.replace(/\s/g, ''));
+  // 4) Extra (suave): en cualquier caso, dentro de palabras con letras, quita espacios sueltos entre letras
+  //    (no elimina espacios entre palabras porque exige letra a ambos lados)
+  t = t.replace(/([A-Za-zÁÉÍÓÚÜÑáéíóúüñ])\s+(?=[A-Za-zÁÉÍÓÚÜÑáéíóúüñ])/g, '$1');
 
   return t;
 }
+
 
 
 // ——— Dibuja texto largo con salto de página automático ———
@@ -513,7 +515,7 @@ y = bump(y, GAP.lg);
   // Insight / lectura humana
     doc.setFont('helvetica','normal');
     doc.setFontSize(11); // antes era 9
-    const insight = normalizeText(data.insightNivel || '');
+    const insight = data.insightNivel || '';
     const insightLines = splitLines(doc, insight, 520);
     y = drawParagraph(doc, insight, M_LEFT, y, 520, 'helvetica', 'normal', 11, 16, GAP.sm);
 
