@@ -251,6 +251,14 @@ function drawExecutiveSummary(doc, {x, y, w, lang, nivelGeneral, promedioGeneral
   return y + GAP.lg;
 }
 
+function hardWrapLongTokens(s, max=28){
+  return String(s).split(/\s/).map(tok=>{
+    if (tok.length <= max) return tok;
+    const parts=[]; for (let i=0;i<tok.length;i+=max) parts.push(tok.slice(i,i+max)+'-');
+    parts[parts.length-1]=parts[parts.length-1].replace(/-$/,''); // quita guion final
+    return parts.join(' ');
+  }).join(' ');
+}
 
 
 
@@ -298,24 +306,32 @@ function drawBoldLabelThenText(doc, label, text, x, y, maxW, gap = 6, size = 10,
 function normalizeText(input){
   if (!input) return '';
   let t = String(input)
-    .replace(/[\u00A0\u2000-\u200B\u202F]/g, ' ')    // NBSP → espacio normal
-    .replace(/[ \t]{2,}/g, ' ')                      // colapsa espacios repetidos
-    .replace(/\n{3,}/g, '\n\n')                      // colapsa saltos
+    .replace(/[\u00A0\u2000-\u200B\u202F]/g, ' ')   // espacios “raros” → espacio normal
+    .replace(/[ \t]{2,}/g, ' ')                     // colapsa espacios múltiples
+    .replace(/\n{3,}/g, '\n\n')                     // colapsa saltos
     .trim();
 
-  // --- de-kerning SOLO dentro de palabras con letras separadas por espacios ---
   const LETTER = 'A-Za-zÁÉÍÓÚÜÑáéíóúüñ';
-  const deKernWord = (line) => line
-    // Ej.: "E n c o n t r a r" → "Encontrar"
-    .replace(new RegExp(`\\b(?:[${LETTER}]\\s){2,}[${LETTER}]\\b`, 'g'),
-             m => m.replace(/\s+/g, ''))
-    // Números espaciados: "2 0 2 4" → "2024"
-    .replace(/\b(?:\d\s){2,}\d\b/g, m => m.replace(/\s+/g, ''));
+  // 1) “E n c o n t r a r” → “Encontrar” (sin depender de \b)
+  const RE1 = new RegExp(`((?:[${LETTER}]\\s){2,}[${LETTER}])`, 'g');
+  // 2) Igual que arriba pero justo antes de puntuación “, . ; : ! ? … ) ] ”
+  const RE2 = new RegExp(`((?:[${LETTER}]\\s){2,}[${LETTER}])(?=\\s*[.,;:!?…\\)\\]\\}"’”])`, 'g');
 
-  t = t.split('\n').map(deKernWord).join('\n');
+  // Repite hasta que no queden rachas espaciadas
+  let prev;
+  do {
+    prev = t;
+    t = t.replace(RE2, m => m.replace(/\s+/g, ''))
+         .replace(RE1, m => m.replace(/\s+/g, ''));
+  } while (t !== prev);
+
+  // Números espaciados: “2 0 2 4” → “2024”
+  const REN = /\b(?:\d\s){2,}\d\b/g;
+  do { prev = t; t = t.replace(REN, m => m.replace(/\s+/g, '')); } while (t !== prev);
 
   return t;
 }
+
 
 
 
@@ -342,19 +358,15 @@ function drawLongTextPaged(doc, text, x, y, maxW, opts = {}){
   // Partimos en párrafos por línea en blanco
   const paragraphs = String(text).split(/\n\s*\n/);
 
-  for (const p of paragraphs){
+  for (let p of paragraphs){
+    p = hardWrapLongTokens(p);                         // ⬅️ rompe “palabras” largas
     const lines = doc.splitTextToSize(p, maxW);
     for (const line of lines){
-      if (y > yLimit){
-        doc.addPage();
-        y = topMargin;
-        doc.setFont(font, style);
-        doc.setFontSize(size);
-      }
+      if (y > yLimit){ doc.addPage(); y = topMargin; doc.setFont(font, style); doc.setFontSize(size); }
       doc.text(line, x, y);
       y += lineH;
     }
-    y += spaceAfter; // espacio entre párrafos
+    y += spaceAfter;                                   // espacio entre párrafos
   }
   return y;
 }
@@ -397,6 +409,9 @@ async function generarPDFyDescargar(data){
   const M_LEFT = 40;
   const M_TOP  = 40;
   let y = M_TOP;
+
+  const pageW = doc.internal.pageSize.getWidth();
+  const maxW  = pageW - M_LEFT - M_RIGHT;   // úsalo en TODAS las llamadas
 
   // ============ PORTADA / PÁGINA 1 ============
 
