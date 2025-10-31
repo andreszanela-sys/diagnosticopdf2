@@ -305,32 +305,32 @@ function drawBoldLabelThenText(doc, label, text, x, y, maxW, gap = 6, size = 10,
 // ——— Normaliza el texto que viene del HTML (quita NBSPs y espacios finos) ———
 function normalizeText(input){
   if (!input) return '';
-  let t = String(input)
-    .replace(/[\u00A0\u2000-\u200B\u202F]/g, ' ')   // espacios “raros” → espacio normal
-    .replace(/[ \t]{2,}/g, ' ')                     // colapsa espacios múltiples
-    .replace(/\n{3,}/g, '\n\n')                     // colapsa saltos
+  let t = String(input);
+
+  // 1) Quitar caracteres invisibles y espacios raros
+  t = t
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/[\u00A0\u202F]/g, ' ')      // NBSP y narrow NBSP → espacio normal
+    .replace(/[\u2000-\u200B]/g, ' ')     // espacios thin/zero-width → espacio
+    .replace(/\u00AD/g, '')               // soft hyphen
+    .replace(/\u2060/g, '')               // word joiner
+    .replace(/\ufeff/g, '')               // BOM
+    .replace(/[\u200C\u200D]/g, '')       // ZWNJ / ZWJ
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-  const LETTER = 'A-Za-zÁÉÍÓÚÜÑáéíóúüñ';
-  // 1) “E n c o n t r a r” → “Encontrar” (sin depender de \b)
-  const RE1 = new RegExp(`((?:[${LETTER}]\\s){2,}[${LETTER}])`, 'g');
-  // 2) Igual que arriba pero justo antes de puntuación “, . ; : ! ? … ) ] ”
-  const RE2 = new RegExp(`((?:[${LETTER}]\\s){2,}[${LETTER}])(?=\\s*[.,;:!?…\\)\\]\\}"’”])`, 'g');
-
-  // Repite hasta que no queden rachas espaciadas
-  let prev;
-  do {
-    prev = t;
-    t = t.replace(RE2, m => m.replace(/\s+/g, ''))
-         .replace(RE1, m => m.replace(/\s+/g, ''));
-  } while (t !== prev);
-
-  // Números espaciados: “2 0 2 4” → “2024”
-  const REN = /\b(?:\d\s){2,}\d\b/g;
-  do { prev = t; t = t.replace(REN, m => m.replace(/\s+/g, '')); } while (t !== prev);
+  // 2) Colapsar patrones de l e t r a s espaciadas (cualquier alfabeto) y números
+  //    (a) letras: "E n c o n t r a r" → "Encontrar"
+  t = t.replace(/((?:\p{L}\s){2,}\p{L})/gu, m => m.replace(/\s+/g, ''));
+  //    (b) justo antes de signos de puntuación
+  t = t.replace(/((?:\p{L}\s){2,}\p{L})(?=\s*[.,;:!?…)\]\}“”"’’])/gu, m => m.replace(/\s+/g, ''));
+  //    (c) números espaciados: "2 0 2 5" → "2025"
+  t = t.replace(/((?:\p{N}\s){2,}\p{N})/gu, m => m.replace(/\s+/g, ''));
 
   return t;
 }
+
 
 
 
@@ -664,6 +664,17 @@ y = bump(y, GAP.lg);
   doc.addPage();
   y = M_TOP;
 
+  // 🔒 Forzar espaciados a 0
+if (doc.setCharSpace)  doc.setCharSpace(0);
+if (doc.setWordSpace)  doc.setWordSpace(0);  // algunas builds lo exponen
+// (opcional) doc.setGState(new doc.GState({ charSpace: 0, wordSpace: 0 })); // si tu build lo permite
+
+const resumenLimpio = normalizeText( limpiarHTML(data.analisisNivel) );
+y = drawLongTextPaged(doc, resumenLimpio, M_LEFT, y, 520, {
+  font: 'helvetica', style: 'normal', size: 10.5, lineH: 16, spaceAfter: 8,
+  topMargin: M_TOP, bottomMargin: 60
+});
+
   doc.setFont('helvetica','bold');
   doc.setFontSize(12);
   doc.text(
@@ -675,9 +686,6 @@ y = bump(y, GAP.lg);
   y+=20;
 
 
-    // ——— Resumen largo con paginado y limpieza de espacios ———
-    doc.setCharSpace && doc.setCharSpace(0); // seguridad: 0 pt entre caracteres
-    const resumenLimpio = normalizeText( limpiarHTML(data.analisisNivel) );
 
     // título ya lo dejaste puesto arriba; ahora el cuerpo:
     y = drawLongTextPaged(doc, resumenLimpio, M_LEFT, y, 520, {
