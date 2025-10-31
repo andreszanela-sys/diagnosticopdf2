@@ -295,16 +295,29 @@ function drawBoldLabelThenText(doc, label, text, x, y, maxW, gap = 6, size = 10,
 
 
 // ——— Normaliza el texto que viene del HTML (quita NBSPs y espacios finos) ———
+// Quita NBSP, espacios finos y también "letra espacio letra espacio..."
 function normalizeText(s){
   if (!s) return '';
-  return String(s)
+  // 1) limpieza básica
+  let t = String(s)
     .replace(/[\u00A0\u2000-\u200B]/g, ' ') // NBSP y espacios finos → espacio normal
-    .replace(/[ \t]+\n/g, '\n')            // espacios antes de salto
-    .replace(/\n[ \t]+/g, '\n')            // espacios después de salto
-    .replace(/[ \t]{2,}/g, ' ')            // colapsa espacios múltiples
-    .replace(/\n{3,}/g, '\n\n')            // no más de 1 línea en blanco
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n[ \t]+/g, '\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
+
+  // 2) des-kerning: colapsa secuencias "L e t r a s" → "Letras"
+  //    Toma grupos de (letra + espacio) repetidos y elimina los espacios internos.
+  t = t.replace(/((?:[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]\s){2,}[A-Za-zÁÉÍÓÚÜÑáéíóúüñ])/g,
+                m => m.replace(/\s/g, ''));
+
+  // 3) versión con soporte Unicode amplio (por si hay otros caracteres)
+  t = t.replace(/((?:\p{L}\s){2,}\p{L})/gu, m => m.replace(/\s/g, ''));
+
+  return t;
 }
+
 
 // ——— Dibuja texto largo con salto de página automático ———
 // Usa el mismo ancho (maxW) que ya usas en la página 1 (520)
@@ -468,25 +481,6 @@ doc.text(data.fecha, M_LEFT + 40, y);
 y = bump(y, GAP.lg);
 
 
-  /*const lineaUsuario1 =
-    (data.idioma === 'en'
-      ? `Name: ${data.nombre} ${data.apellido}  |  Organization: ${data.empresa}`
-      : `Nombre: ${data.nombre} ${data.apellido}  |  Empresa: ${data.empresa}`);
-
-  const lineaUsuario2 =
-    (data.idioma === 'en'
-      ? `Role: ${data.puesto}  |  Country: ${data.pais}`
-      : `Puesto: ${data.puesto}  |  País: ${data.pais}`);
-
-  const lineaUsuario3 =
-    (data.idioma === 'en'
-      ? `Date: ${data.fecha}`
-      : `Fecha: ${data.fecha}`);
-
-  doc.setFontSize(11);
-  y = drawParagraph(doc, lineaUsuario1, M_LEFT, y, 520, "helvetica", "normal", 9);
-  y = drawParagraph(doc, lineaUsuario2, M_LEFT, y, 520, "helvetica", "normal", 9);
-  y = drawParagraph(doc, lineaUsuario3, M_LEFT, y, 520, "helvetica", "normal", 9);*/
 
   // Frase inspiradora
   doc.setFont('helvetica','italic');
@@ -519,7 +513,7 @@ y = bump(y, GAP.lg);
   // Insight / lectura humana
     doc.setFont('helvetica','normal');
     doc.setFontSize(11); // antes era 9
-    const insight = data.insightNivel || '';
+    const insight = normalizeText(data.insightNivel || '');
     const insightLines = splitLines(doc, insight, 520);
     y = drawParagraph(doc, insight, M_LEFT, y, 520, 'helvetica', 'normal', 11, 16, GAP.sm);
 
@@ -564,9 +558,6 @@ y = bump(y, GAP.lg);
     });
    y = bump(y, GAP.xs);
 
-
-   
-
     const recoLabel = (data.idioma === 'en') ? 'Key recommendation:' : 'Recomendación clave:';
     const recoBody  = (data.idioma === 'en')
     ? ' Focus leadership attention on the 2–3 lowest scoring areas and link fixes to strategic purpose. Disconnection is expensive — and reversible.'
@@ -577,9 +568,6 @@ y = bump(y, GAP.lg);
     y = drawBoldLabelThenText(doc, recoLabel, recoBody, M_LEFT, y, 520, 6, 10, 12);
    y = bump(y, GAP.md);
 
-
-
-  
 
   // Tabla resumen por dimensión
   doc.setFont('helvetica','bold');
@@ -652,6 +640,9 @@ y = bump(y, GAP.lg);
     pageH - 32     // posición Y (32pt desde el borde inferior)
     );
 
+
+
+
   // ============ PÁGINA 2: Retos / Fortalezas / Acciones clave ============
   doc.addPage();
   y = M_TOP;
@@ -668,6 +659,7 @@ y = bump(y, GAP.lg);
 
 
     // ——— Resumen largo con paginado y limpieza de espacios ———
+    doc.setCharSpace && doc.setCharSpace(0); // seguridad: 0 pt entre caracteres
     const resumenLimpio = normalizeText( limpiarHTML(data.analisisNivel) );
 
     // título ya lo dejaste puesto arriba; ahora el cuerpo:
