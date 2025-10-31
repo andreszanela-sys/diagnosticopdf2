@@ -213,7 +213,7 @@ function drawExecutiveSummary(doc, {x, y, w, lang, nivelGeneral, promedioGeneral
   // Encabezado
   doc.setFillColor(240,240,240);
   doc.roundedRect(x, y, w, HROW, 6, 6, 'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(10);
+  doc.setFont('helvetica','bold'); doc.setFontSize(11);
   const HEADS = (lang==='en' ? ['Indicator','Value','Interpretation']
                               : ['Indicador','Valor','Interpretación']);
   let cx = x + PAD, cy = y + 13;
@@ -236,10 +236,11 @@ function drawExecutiveSummary(doc, {x, y, w, lang, nivelGeneral, promedioGeneral
     let tx = x + PAD, ty = y + 13;
     doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.text(row[0], tx, ty);
     // col 2 (valor)
-    tx += cols[0]; doc.setFont('helvetica','normal'); doc.text(row[1], tx, ty);
+    tx += cols[0]; doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.text(row[1], tx, ty);
     // col 3 (interpretación wrap)
     tx += cols[1];
     const wrap = doc.splitTextToSize(String(row[2]), cols[2]-PAD);
+    doc.setFontSize(10.5);
     doc.text(wrap, tx, ty);
     const h = Math.max(HROW, 14 * wrap.length + 6);
     y += h;
@@ -290,6 +291,58 @@ function drawBoldLabelThenText(doc, label, text, x, y, maxW, gap = 6, size = 10,
   });
 
   return yy; // devuelve el siguiente y disponible
+}
+
+
+// ——— Normaliza el texto que viene del HTML (quita NBSPs y espacios finos) ———
+function normalizeText(s){
+  if (!s) return '';
+  return String(s)
+    .replace(/[\u00A0\u2000-\u200B]/g, ' ') // NBSP y espacios finos → espacio normal
+    .replace(/[ \t]+\n/g, '\n')            // espacios antes de salto
+    .replace(/\n[ \t]+/g, '\n')            // espacios después de salto
+    .replace(/[ \t]{2,}/g, ' ')            // colapsa espacios múltiples
+    .replace(/\n{3,}/g, '\n\n')            // no más de 1 línea en blanco
+    .trim();
+}
+
+// ——— Dibuja texto largo con salto de página automático ———
+// Usa el mismo ancho (maxW) que ya usas en la página 1 (520)
+function drawLongTextPaged(doc, text, x, y, maxW, opts = {}){
+  const {
+    font = 'helvetica',
+    style = 'normal',
+    size = 10.5,
+    lineH = 14,
+    spaceAfter = 0,
+    topMargin = 40,      // M_TOP
+    bottomMargin = 60,   // pie de página
+  } = opts;
+
+  const pageH = doc.internal.pageSize.getHeight();
+  const yLimit = pageH - bottomMargin;
+
+  doc.setFont(font, style);
+  doc.setFontSize(size);
+
+  // Partimos en párrafos por línea en blanco
+  const paragraphs = String(text).split(/\n\s*\n/);
+
+  for (const p of paragraphs){
+    const lines = doc.splitTextToSize(p, maxW);
+    for (const line of lines){
+      if (y > yLimit){
+        doc.addPage();
+        y = topMargin;
+        doc.setFont(font, style);
+        doc.setFontSize(size);
+      }
+      doc.text(line, x, y);
+      y += lineH;
+    }
+    y += spaceAfter; // espacio entre párrafos
+  }
+  return y;
 }
 
 
@@ -374,7 +427,7 @@ async function generarPDFyDescargar(data){
     M_LEFT,
     y
   );
- y = bump(y, GAP.xl);
+ y = bump(y, GAP.lg);
 
 
   // Bloque de datos del usuario/empresa
@@ -393,7 +446,7 @@ doc.setFont(labelFont, 'bold');
 doc.text(data.idioma === 'en' ? 'Organization:' : 'Empresa:', M_LEFT + 220, y);
 doc.setFont(valueFont, 'normal');
 doc.text(data.empresa, M_LEFT + 300, y);
-y = bump(y, GAP.md);
+y = bump(y, GAP.lg);
 
 // Línea 2: Puesto + País
 doc.setFont(labelFont, 'bold');
@@ -405,7 +458,7 @@ doc.setFont(labelFont, 'bold');
 doc.text(data.idioma === 'en' ? 'Country:' : 'País:', M_LEFT + 220, y);
 doc.setFont(valueFont, 'normal');
 doc.text(data.pais || '', M_LEFT + 260, y);
-y = bump(y, GAP.md);
+y = bump(y, GAP.lg);
 
 // Línea 3: Fecha
 doc.setFont(labelFont, 'bold');
@@ -458,7 +511,7 @@ y = bump(y, GAP.lg);
       : 'Nivel general organizacional',
     M_LEFT, y
   );
-  y = bump(y, GAP.lg);
+  y = bump(y, GAP.md);
 
 
   
@@ -511,48 +564,6 @@ y = bump(y, GAP.lg);
     });
    y = bump(y, GAP.xs);
 
-
-
-
-    // Parámetros de caja
-    /*const NUM_ROWS = 4;
-    const ROW_H = 14;          // alto por renglón (coincide con tu interlínea)
-    const PAD_Y = 12;          // padding vertical
-    const PAD_X = 12;          // padding horizontal
-    const BOX_X = M_LEFT - 4;  // un pelín a la izquierda para redondeo
-    const BOX_W = 520;
-    const CONTENT_H = NUM_ROWS * ROW_H;
-    const BOX_H = PAD_Y * 2 + CONTENT_H;     // ← altura dinámica
-
-    // Dibuja la caja
-    doc.setFillColor(245,245,245);
-    doc.setDrawColor(230);        // borde sutil (opcional)
-    doc.setLineWidth(0.6);
-    doc.roundedRect(BOX_X, y, BOX_W, BOX_H, 6, 6, 'FD'); // 'FD' = Fill + Draw
-
-    // Tipografía de las líneas
-    doc.setFontSize(10);
-    const baseX = BOX_X + PAD_X;
-    const valX  = baseX + 170;    // columna de valores
-    let baseY   = y + PAD_Y + 10; // primera línea dentro de la caja
-
-    function drawKV(lbl, val, row){
-    const lineY = baseY + row * ROW_H;
-    doc.setFont('helvetica','bold');   doc.text(lbl, baseX, lineY);
-    doc.setFont('helvetica','normal'); doc.text(val,  valX,  lineY);
-    }
-
-    // 1) Promedio
-    drawKV(lang==='en' ? 'Overall score:' : 'Promedio general:', `${data.promedioGeneral} / 5`, 0);
-    // 2) Nivel
-    drawKV(lang==='en' ? 'General level:' : 'Nivel general:', `${data.nivelGeneral}`, 1);
-    // 3) Costo total
-    drawKV(lang==='en' ? 'Total hidden cost:' : 'Costo oculto total:', `${data.costoTotalUSD}`, 2);
-    // 4) ROI (recuperable potencial)
-    drawKV('ROI', fmtMoney(recuperableTotalN, lang), 3);
-
-    // Avanza el cursor por debajo de la caja
-    y += BOX_H + 20;*/
 
    
 
@@ -615,7 +626,7 @@ y = bump(y, GAP.lg);
         : `Costo oculto estimado: ${data.costoTotalUSD} al año.`
     );
     doc.setFont('helvetica','bold'); doc.setFontSize(10);
-    y = drawParagraph(doc, totalLinea, M_LEFT, y, 520, 'helvetica', 'bold', 10, 12, 8);
+    y = drawParagraph(doc, totalLinea, M_LEFT, y, 520, 'helvetica', 'bold', 10, 12, 3);
     y = bump(y, GAP.xs);
 
 
@@ -655,10 +666,26 @@ y = bump(y, GAP.lg);
   );
   y+=20;
 
+
+    // ——— Resumen largo con paginado y limpieza de espacios ———
+    const resumenLimpio = normalizeText( limpiarHTML(data.analisisNivel) );
+
+    // título ya lo dejaste puesto arriba; ahora el cuerpo:
+    y = drawLongTextPaged(doc, resumenLimpio, M_LEFT, y, 520, {
+    font: 'helvetica',
+    style: 'normal',
+    size: 10.5,     // sube un poco para legibilidad
+    lineH: 16,      // interlínea cómoda
+    spaceAfter: 8,  // separación entre párrafos
+    topMargin: M_TOP,
+    bottomMargin: 60
+    });
+
+
   // El campo analisisNivel es la narrativa larga que tú armaste (parts.htmlFull),
   // que incluye retos prioritarios, fortalezas, % de costo, recomendación.
   // Lo vamos a volcar aquí como texto multilinea:
-  doc.setFont('helvetica','normal');
+  /*doc.setFont('helvetica','normal');
   doc.setFontSize(9);
   const analisisLines = splitLines(doc, limpiarHTML(data.analisisNivel), 520);
   // Vamos dibujando línea por línea y saltando de página si se llena
@@ -671,7 +698,7 @@ y = bump(y, GAP.lg);
     }
     doc.text(analisisLines[i], M_LEFT, y);
     y+=12;
-  }
+  }*/
 
   // descarga
   const fileName = generarNombreArchivo(data);
