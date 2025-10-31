@@ -295,29 +295,28 @@ function drawBoldLabelThenText(doc, label, text, x, y, maxW, gap = 6, size = 10,
 
 
 // ——— Normaliza el texto que viene del HTML (quita NBSPs y espacios finos) ———
-// Normaliza NBSP/espacios finos y elimina "kerning falso" línea por línea
 function normalizeText(input){
   if (!input) return '';
   let t = String(input)
-    // 1) NBSP y espacios finos → espacio normal
-    .replace(/[\u00A0\u2000-\u200B\u202F]/g, ' ')
-    // 2) colapsa espacios repetidos y limpia saltos
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n[ \t]+/g, '\n')
-    .replace(/[ \t]{2,}/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[\u00A0\u2000-\u200B\u202F]/g, ' ')    // NBSP → espacio normal
+    .replace(/[ \t]{2,}/g, ' ')                      // colapsa espacios repetidos
+    .replace(/\n{3,}/g, '\n\n')                      // colapsa saltos
     .trim();
 
-  // 3) De-kerning robusto: si una SUBCADENA luce como "C a d e n a" (≥6 alternancias),
-  //    le quitamos los espacios internos sin tocar el resto de la línea.
-  t = t.replace(/((?:\S\s){6,}\S)/g, (m) => m.replace(/(?<=\S)\s(?=\S)/g, ''));
+  // --- de-kerning SOLO dentro de palabras con letras separadas por espacios ---
+  const LETTER = 'A-Za-zÁÉÍÓÚÜÑáéíóúüñ';
+  const deKernWord = (line) => line
+    // Ej.: "E n c o n t r a r" → "Encontrar"
+    .replace(new RegExp(`\\b(?:[${LETTER}]\\s){2,}[${LETTER}]\\b`, 'g'),
+             m => m.replace(/\s+/g, ''))
+    // Números espaciados: "2 0 2 4" → "2024"
+    .replace(/\b(?:\d\s){2,}\d\b/g, m => m.replace(/\s+/g, ''));
 
-  // 4) Extra (suave): en cualquier caso, dentro de palabras con letras, quita espacios sueltos entre letras
-  //    (no elimina espacios entre palabras porque exige letra a ambos lados)
-  t = t.replace(/([A-Za-zÁÉÍÓÚÜÑáéíóúüñ])\s+(?=[A-Za-zÁÉÍÓÚÜÑáéíóúüñ])/g, '$1');
+  t = t.split('\n').map(deKernWord).join('\n');
 
   return t;
 }
+
 
 
 
