@@ -307,26 +307,31 @@ function normalizeText(input){
   if (!input) return '';
   let t = String(input);
 
-  // 1) Quitar caracteres invisibles y espacios raros
+  // Quita espacios invisibles / NBSP / soft-hyphens, etc.
   t = t
     .replace(/&nbsp;/gi, ' ')
-    .replace(/[\u00A0\u202F]/g, ' ')      // NBSP y narrow NBSP → espacio normal
-    .replace(/[\u2000-\u200B]/g, ' ')     // espacios thin/zero-width → espacio
-    .replace(/\u00AD/g, '')               // soft hyphen
-    .replace(/\u2060/g, '')               // word joiner
-    .replace(/\ufeff/g, '')               // BOM
-    .replace(/[\u200C\u200D]/g, '')       // ZWNJ / ZWJ
+    .replace(/[\u00A0\u202F]/g, ' ')
+    .replace(/[\u2000-\u200B]/g, ' ')
+    .replace(/\u00AD/g, '')
+    .replace(/\u2060/g, '')
+    .replace(/\ufeff/g, '')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-  // 2) Colapsar patrones de l e t r a s espaciadas (cualquier alfabeto) y números
-  //    (a) letras: "E n c o n t r a r" → "Encontrar"
-  t = t.replace(/((?:\p{L}\s){2,}\p{L})/gu, m => m.replace(/\s+/g, ''));
-  //    (b) justo antes de signos de puntuación
-  t = t.replace(/((?:\p{L}\s){2,}\p{L})(?=\s*[.,;:!?…)\]\}“”"’’])/gu, m => m.replace(/\s+/g, ''));
-  //    (c) números espaciados: "2 0 2 5" → "2025"
-  t = t.replace(/((?:\p{N}\s){2,}\p{N})/gu, m => m.replace(/\s+/g, ''));
+  // ✅ Colapsa SÓLO tokens completamente espaciados (E n t r e   c o m i l l a s)
+  //    Requiere límites de palabra para no “atrapar” subcadenas dentro de palabras.
+  t = t.replace(/\b((?:\p{L}\s){2,}\p{L})\b/gu, m => m.replace(/\s+/g, ''));
+
+  // ✅ Números espaciados (2 0 2 5) → 2025 (no afecta 12–18)
+  t = t.replace(/\b((?:\p{N}\s){2,}\p{N})\b/gu, m => m.replace(/\s+/g, ''));
+
+  // Espacios antes de puntuación
+  t = t.replace(/\s+([.,;:!?…)\]\}])/g, '$1')
+       .replace(/([(\[\{])\s+/g, '$1');
+
+  // Normaliza comillas “ ”
+  t = t.replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
 
   return t;
 }
@@ -726,14 +731,19 @@ function splitLines(doc, text, maxWidth){
 
 function limpiarHTML(htmlString){
   if (!htmlString) return '';
-  // quita etiquetas básicas <p>, <strong>, etc.
   return String(htmlString)
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/p>/gi, '\n\n')
+    // agrega un espacio al eliminar tags inline para no pegar palabras
+    .replace(/<\/?(strong|em|b|i|u|span)[^>]*>/gi, ' ')
+    // elimina el resto de etiquetas
     .replace(/<[^>]+>/g, '')
+    // colapsa espacios y líneas
+    .replace(/[ \t]{2,}/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
+
 
 // Genera nombre de archivo final
 function generarNombreArchivo(data){
