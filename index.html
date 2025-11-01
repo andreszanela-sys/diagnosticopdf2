@@ -307,7 +307,7 @@ function normalizeText(input){
   if (!input) return '';
   let t = String(input);
 
-  // Quita espacios invisibles / NBSP / soft-hyphens, etc.
+  // 1) Quita espacios invisibles / NBSP / soft-hyphens, etc.
   t = t
     .replace(/&nbsp;/gi, ' ')
     .replace(/[\u00A0\u202F]/g, ' ')
@@ -319,24 +319,18 @@ function normalizeText(input){
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-  // ✅ Colapsa SÓLO tokens completamente espaciados (E n t r e   c o m i l l a s)
-  //    Requiere límites de palabra para no “atrapar” subcadenas dentro de palabras.
-  //t = t.replace(/\b((?:\p{L}\s){2,}\p{L})\b/gu, m => m.replace(/\s+/g, ''));
+  // 2) **Clave**: colapsa tokens con letras separadas por espacios (E n   t e x t o → En texto)
+  //    No toca los espacios "entre palabras".
+  t = t.replace(/\b((?:\p{L}\s){2,}\p{L})\b/gu, m => m.replace(/\s+/g, ''));
 
-  // ✅ Números espaciados (2 0 2 5) → 2025 (no afecta 12–18)
-  //t = t.replace(/\b((?:\p{N}\s){2,}\p{N})\b/gu, m => m.replace(/\s+/g, ''));
+  // 3) También números separados por espacios (2 0 2 5 → 2025). No afecta "12–18".
+  t = t.replace(/\b((?:\p{N}\s){2,}\p{N})\b/gu, m => m.replace(/\s+/g, ''));
 
-  t = t.replace(
-  /(["“])((?:\p{L}\s){3,}\p{L})(["”])/gu,
-  (_, open, seq, close) => open + seq.replace(/\s+/g,'') + close
-  );
-
-  // Espacios antes de puntuación
+  // 4) Limpia espacios antes/después de puntuación y normaliza comillas
   t = t.replace(/\s+([.,;:!?…)\]\}])/g, '$1')
-       .replace(/([(\[\{])\s+/g, '$1');
-
-  // Normaliza comillas “ ”
-  t = t.replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
+       .replace(/([(\[\{])\s+/g, '$1')
+       .replace(/[“”]/g, '"')
+       .replace(/[‘’]/g, "'");
 
   return t;
 }
@@ -585,6 +579,8 @@ y = bump(y, GAP.lg);
     });
    y = bump(y, GAP.xs);
 
+
+    doc.setFontSize(10);
     const recoLabel = (data.idioma === 'en') ? 'Key recommendation:' : 'Recomendación clave:';
     const recoBody  = (data.idioma === 'en')
     ? ' Focus leadership attention on the 2–3 lowest scoring areas and link fixes to strategic purpose. Disconnection is expensive — and reversible.'
