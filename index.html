@@ -321,10 +321,15 @@ function normalizeText(input){
 
   // ✅ Colapsa SÓLO tokens completamente espaciados (E n t r e   c o m i l l a s)
   //    Requiere límites de palabra para no “atrapar” subcadenas dentro de palabras.
-  t = t.replace(/\b((?:\p{L}\s){2,}\p{L})\b/gu, m => m.replace(/\s+/g, ''));
+  //t = t.replace(/\b((?:\p{L}\s){2,}\p{L})\b/gu, m => m.replace(/\s+/g, ''));
 
   // ✅ Números espaciados (2 0 2 5) → 2025 (no afecta 12–18)
-  t = t.replace(/\b((?:\p{N}\s){2,}\p{N})\b/gu, m => m.replace(/\s+/g, ''));
+  //t = t.replace(/\b((?:\p{N}\s){2,}\p{N})\b/gu, m => m.replace(/\s+/g, ''));
+
+  t = t.replace(
+  /(["“])((?:\p{L}\s){3,}\p{L})(["”])/gu,
+  (_, open, seq, close) => open + seq.replace(/\s+/g,'') + close
+  );
 
   // Espacios antes de puntuación
   t = t.replace(/\s+([.,;:!?…)\]\}])/g, '$1')
@@ -670,8 +675,8 @@ y = bump(y, GAP.lg);
   y = M_TOP;
 
   // 🔒 Forzar espaciados a 0
-if (doc.setCharSpace)  doc.setCharSpace(0);
-if (doc.setWordSpace)  doc.setWordSpace(0);  // algunas builds lo exponen
+//if (doc.setCharSpace)  doc.setCharSpace(0);
+//if (doc.setWordSpace)  doc.setWordSpace(0);  // algunas builds lo exponen
 // (opcional) doc.setGState(new doc.GState({ charSpace: 0, wordSpace: 0 })); // si tu build lo permite
 
 const resumenLimpio = normalizeText( limpiarHTML(data.analisisNivel) );
