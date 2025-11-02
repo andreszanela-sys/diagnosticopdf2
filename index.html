@@ -307,33 +307,35 @@ function normalizeText(input){
   if (!input) return '';
   let t = String(input);
 
-  // 1) Quita espacios invisibles / NBSP / soft-hyphens, etc.
+  // Invisibles y rarezas
   t = t
     .replace(/&nbsp;/gi, ' ')
     .replace(/[\u00A0\u202F]/g, ' ')
     .replace(/[\u2000-\u200B]/g, ' ')
-    .replace(/\u00AD/g, '')
-    .replace(/\u2060/g, '')
+    .replace(/\u00AD/g, '')     // soft hyphen
+    .replace(/\u2060/g, '')     // word joiner
     .replace(/\ufeff/g, '')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/[–—]/g, '-')      // guiones seguros
     .trim();
 
-  // 2) **Clave**: colapsa tokens con letras separadas por espacios (E n   t e x t o → En texto)
-  //    No toca los espacios "entre palabras".
+  // Colapsa letras separadas por espacios (pero sólo secuencias largas)
   t = t.replace(/\b((?:\p{L}\s){2,}\p{L})\b/gu, m => m.replace(/\s+/g, ''));
-
-  // 3) También números separados por espacios (2 0 2 5 → 2025). No afecta "12–18".
   t = t.replace(/\b((?:\p{N}\s){2,}\p{N})\b/gu, m => m.replace(/\s+/g, ''));
 
-  // 4) Limpia espacios antes/después de puntuación y normaliza comillas
+  // Espacios con puntuación
   t = t.replace(/\s+([.,;:!?…)\]\}])/g, '$1')
-       .replace(/([(\[\{])\s+/g, '$1')
-       .replace(/[“”]/g, '"')
-       .replace(/[‘’]/g, "'");
+       .replace(/([(\[\{])\s+/g, '$1');
+
+  // 🔑 quita letra inicial huérfana si quedó
+  t = stripDanglingInitials(t);
 
   return t;
 }
+
 
 
 
@@ -388,69 +390,52 @@ function renderAnalisisConNegritas(doc, text, x, y, maxW, opts = {}) {
   doc.setFont('helvetica','normal');
   doc.setFontSize(size);
 
-  const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // 1) Normalizador para comillas/guiones (antes de los regex)
+const QL = `[“"']`;   // abre
+const QR = `[”"']`;   // cierra
+const DASH = `[—–-]`;
 
-  // ====== Config de detección ES/EN (FUERA de drawBoldLine) ======
-  const AREAS_ES = [
-    'Propósito y estrategia',
-    'Liderazgo y gobernanza',
-    'Cultura y bienestar',
-    'Aprendizaje e innovación',
-    'Procesos y tecnología',
-    'Sostenibilidad e impacto'
-  ];
-  const AREAS_EN_RAW = [
-    'Purpose & Strategy',
-    'Leadership & Governance',
-    'Culture & Wellbeing',
-    'Learning & Innovation',
-    'Processes & Technology',
-    'Sustainability & Impact'
-  ];
-
-// ====== 1) Diccionarios ya existentes arriba (no tocar) ======
-// ... AREAS_ES, AREAS_EN_RAW, etc.
-
-// Añade helpers:
-
-// Permite "&" o "and", y Wellbeing/Well-being, sin generar escapes inválidos
+// 2) Áreas flexibles en EN: "&" o "and", Wellbeing / Well-being
+const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const AREAS_ES = [
+  'Propósito y estrategia',
+  'Liderazgo y gobernanza',
+  'Cultura y bienestar',
+  'Aprendizaje e innovación',
+  'Procesos y tecnología',
+  'Sostenibilidad e impacto'
+];
+const AREAS_EN_RAW = [
+  'Purpose & Strategy',
+  'Leadership & Governance',
+  'Culture & Wellbeing',
+  'Learning & Innovation',
+  'Processes & Technology',
+  'Sustainability & Impact'
+];
 const toFlexibleEN = s => esc(s)
-  .replace(/&/g, '\\s*(?:&|and)\\s*')   // " & " → "\s*(?:&|and)\s*"
+  .replace(/&/g, '\\s*(?:&|and)\\s*')
   .replace(/Wellbeing/g, 'Well[- ]?being');
-
 const AREAS_EN_FLEX = AREAS_EN_RAW.map(toFlexibleEN);
 const AREAS_ALT = [...AREAS_ES.map(esc), ...AREAS_EN_FLEX].join('|');
 
-// Guiones y comillas (usar backticks para evitar escapes raros)
-const DASH = `[—–-]`;
-const QL   = `[“"']`;   // comillas de apertura aceptadas
-const QR   = `[”"']`;   // comillas de cierre aceptadas         // comilla derecha (curly o recta)
-
-// 1) En|In <Área> — “insight”. resto
+// 3) Patrones robustos
 const AREA_RX = new RegExp(
   `^\\s*((?:En|In)\\s+(${AREAS_ALT}))\\s+${DASH}\\s+${QL}?([^”"']+)${QR}?\\.?\\s*(.*)$`,
   'u'
 );
-
-// 2) Oportunidades prioritarias / Priority opportunities
 const OPORT_RX = new RegExp(
   `^\\s*(Oportunidades prioritarias\\.|Priority opportunities\\.)\\s*(.*)$`,
   'u'
 );
-
-// 3) Fortalezas clave / Key strengths
 const FORTC_RX = new RegExp(
   `^\\s*(Fortalezas clave\\.|Key strengths\\.)\\s*(.*)$`,
   'u'
 );
-
-// 4) <Área> — “insight”. resto (líneas dentro de fortalezas)
 const FORT_AREA_RX = new RegExp(
   `^\\s*(${AREAS_ALT})\\s+${DASH}\\s+${QL}?([^”"']+)${QR}?\\.?\\s*(.*)$`,
   'u'
 );
-
-// 5) (opcional) Fortaleza|Strength – <Área> — “insight”. resto
 const FORTL_RX = new RegExp(
   `^\\s*((?:Fortaleza|Strength)\\s+[–-]\\s+(${AREAS_ALT}))\\s+${DASH}\\s+${QL}?([^”"']+)${QR}?\\.?\\s*(.*)$`,
   'u'
@@ -830,7 +815,14 @@ y = bump(y, GAP.lg);
 //if (doc.setWordSpace)  doc.setWordSpace(0);  // algunas builds lo exponen
 // (opcional) doc.setGState(new doc.GState({ charSpace: 0, wordSpace: 0 })); // si tu build lo permite
 
-const resumenLimpio = normalizeText( limpiarHTML(data.analisisNivel) );
+const resumenLimpio = stripDanglingInitials(
+  normalizeText(
+    limpiarHTML(data.analisisNivel)
+  )
+);
+y = renderAnalisisConNegritas(doc, resumenLimpio, M_LEFT, y, 520, {
+  size: 10.5, lineH: 16, topMargin: M_TOP, bottomMargin: 60
+});
 
 
   doc.setFont('helvetica','bold');
@@ -885,15 +877,22 @@ function limpiarHTML(htmlString){
   return String(htmlString)
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/p>/gi, '\n\n')
-    // agrega un espacio al eliminar tags inline para no pegar palabras
-    .replace(/<\/?(strong|em|b|i|u|span)[^>]*>/gi, ' ')
-    // elimina el resto de etiquetas
+    // Elimina inline tags SIN insertar espacios que queden flotando
+    .replace(/<\/?(strong|em|b|i|u|span)\b[^>]*>/gi, '')
+    // Elimina el resto de etiquetas
     .replace(/<[^>]+>/g, '')
-    // colapsa espacios y líneas
+    // Sustitutos seguros
+    .replace(/&nbsp;/gi, ' ')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
+
+function stripDanglingInitials(s){
+  // elimina letra suelta al inicio: "R Simplificar…" → "Simplificar…"
+  return String(s).replace(/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]\s+(?=\p{L})/u, '');
+}
+
 
 
 // Genera nombre de archivo final
