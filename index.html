@@ -388,6 +388,8 @@ function renderAnalisisConNegritas(doc, text, x, y, maxW, opts = {}) {
   doc.setFont('helvetica','normal');
   doc.setFontSize(size);
 
+  const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
   // ====== Config de detección ES/EN (FUERA de drawBoldLine) ======
   const AREAS_ES = [
     'Propósito y estrategia',
@@ -410,46 +412,47 @@ function renderAnalisisConNegritas(doc, text, x, y, maxW, opts = {}) {
 // ... AREAS_ES, AREAS_EN_RAW, etc.
 
 // Añade helpers:
-const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// Permite "&" o "and", y Wellbeing/Well-being, sin generar escapes inválidos
 const toFlexibleEN = s => esc(s)
-  .replace(/\\s*&\\s*/i, '\\s*(?:&|and)\\s*')
-  .replace(/Wellbeing/i, 'Well[- ]?being'); // Wellbeing o Well-being
+  .replace(/&/g, '\\s*(?:&|and)\\s*')   // " & " → "\s*(?:&|and)\s*"
+  .replace(/Wellbeing/g, 'Well[- ]?being');
 
 const AREAS_EN_FLEX = AREAS_EN_RAW.map(toFlexibleEN);
 const AREAS_ALT = [...AREAS_ES.map(esc), ...AREAS_EN_FLEX].join('|');
 
-// Guiones y comillas flexibles
-const DASH = '[—–-]';              // em dash, en dash o guion normal
-const QL = '[“"\\\']';             // comilla izquierda (curly o recta)
-const QR = '[”"\\\']';             // comilla derecha (curly o recta)
+// Guiones y comillas (usar backticks para evitar escapes raros)
+const DASH = `[—–-]`;
+const QL   = `[“"']`;   // comillas de apertura aceptadas
+const QR   = `[”"']`;   // comillas de cierre aceptadas         // comilla derecha (curly o recta)
 
 // 1) En|In <Área> — “insight”. resto
 const AREA_RX = new RegExp(
-  `^\\s*((?:En|In)\\s+(${AREAS_ALT}))\\s+${DASH}\\s+${QL}?([^”"\\']+)${QR}?\\.?\\s*(.*)$`,
+  `^\\s*((?:En|In)\\s+(${AREAS_ALT}))\\s+${DASH}\\s+${QL}?([^”"']+)${QR}?\\.?\\s*(.*)$`,
   'u'
 );
 
 // 2) Oportunidades prioritarias / Priority opportunities
 const OPORT_RX = new RegExp(
-  '^\\s*(Oportunidades prioritarias\\.|Priority opportunities\\.)\\s*(.*)$',
+  `^\\s*(Oportunidades prioritarias\\.|Priority opportunities\\.)\\s*(.*)$`,
   'u'
 );
 
 // 3) Fortalezas clave / Key strengths
 const FORTC_RX = new RegExp(
-  '^\\s*(Fortalezas clave\\.|Key strengths\\.)\\s*(.*)$',
+  `^\\s*(Fortalezas clave\\.|Key strengths\\.)\\s*(.*)$`,
   'u'
 );
 
 // 4) <Área> — “insight”. resto (líneas dentro de fortalezas)
 const FORT_AREA_RX = new RegExp(
-  `^\\s*(${AREAS_ALT})\\s+${DASH}\\s+${QL}?([^”"\\']+)${QR}?\\.?\\s*(.*)$`,
+  `^\\s*(${AREAS_ALT})\\s+${DASH}\\s+${QL}?([^”"']+)${QR}?\\.?\\s*(.*)$`,
   'u'
 );
 
 // 5) (opcional) Fortaleza|Strength – <Área> — “insight”. resto
 const FORTL_RX = new RegExp(
-  `^\\s*((?:Fortaleza|Strength)\\s+[–-]\\s+(${AREAS_ALT}))\\s+${DASH}\\s+${QL}?([^”"\\']+)${QR}?\\.?\\s*(.*)$`,
+  `^\\s*((?:Fortaleza|Strength)\\s+[–-]\\s+(${AREAS_ALT}))\\s+${DASH}\\s+${QL}?([^”"']+)${QR}?\\.?\\s*(.*)$`,
   'u'
 );
 
