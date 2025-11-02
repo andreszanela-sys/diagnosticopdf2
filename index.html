@@ -305,35 +305,26 @@ function drawBoldLabelThenText(doc, label, text, x, y, maxW, gap = 6, size = 10,
 // ——— Normaliza el texto que viene del HTML (quita NBSPs y espacios finos) ———
 function normalizeText(input){
   if (!input) return '';
-  let t = String(input);
-
-  // Invisibles y rarezas
-  t = t
+  let t = String(input)
     .replace(/&nbsp;/gi, ' ')
     .replace(/[\u00A0\u202F]/g, ' ')
     .replace(/[\u2000-\u200B]/g, ' ')
-    .replace(/\u00AD/g, '')     // soft hyphen
-    .replace(/\u2060/g, '')     // word joiner
-    .replace(/\ufeff/g, '')
+    .replace(/\u00AD|\u2060|\ufeff/g, '')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .replace(/[“”]/g, '"')
     .replace(/[‘’]/g, "'")
-    .replace(/[–—]/g, '-')      // guiones seguros
+    .replace(/[–—]/g, '-')
+    .replace(/\s+([.,;:!?…)\]\}])/g, '$1')
+    .replace(/([(\[\{])\s+/g, '$1')
     .trim();
 
-  // Colapsa letras separadas por espacios (pero sólo secuencias largas)
+  // colapsa secuencias "l e t r a s" separadas
   t = t.replace(/\b((?:\p{L}\s){2,}\p{L})\b/gu, m => m.replace(/\s+/g, ''));
   t = t.replace(/\b((?:\p{N}\s){2,}\p{N})\b/gu, m => m.replace(/\s+/g, ''));
 
-  // Espacios con puntuación
-  t = t.replace(/\s+([.,;:!?…)\]\}])/g, '$1')
-       .replace(/([(\[\{])\s+/g, '$1');
-
-  // 🔑 quita letra inicial huérfana si quedó
-  t = stripDanglingInitials(t);
-
-  return t;
+  // 🔑 aplica la limpieza de letras huérfanas en todo el texto
+  return stripDanglingInitials(t);
 }
 
 
@@ -820,9 +811,7 @@ const resumenLimpio = stripDanglingInitials(
     limpiarHTML(data.analisisNivel)
   )
 );
-y = renderAnalisisConNegritas(doc, resumenLimpio, M_LEFT, y, 520, {
-  size: 10.5, lineH: 16, topMargin: M_TOP, bottomMargin: 60
-});
+
 
 
   doc.setFont('helvetica','bold');
@@ -889,8 +878,12 @@ function limpiarHTML(htmlString){
 }
 
 function stripDanglingInitials(s){
-  // elimina letra suelta al inicio: "R Simplificar…" → "Simplificar…"
-  return String(s).replace(/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]\s+(?=\p{L})/u, '');
+  // quita letra huérfana al inicio de línea O tras punto/salto
+  return String(s)
+    // inicio de línea
+    .replace(/(^|\n)\s*[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]\s+(?=\p{L})/gu, '$1')
+    // después de punto o dos puntos
+    .replace(/([.:])\s*[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]\s+(?=\p{L})/gu, '$1 ');
 }
 
 
