@@ -380,150 +380,132 @@ function normalizeText(input){
 }*/
 
 function renderAnalisisConNegritas(doc, text, x, y, maxW, opts = {}) {
-  const {
-    size = 10.5, lineH = 16, topMargin = 40, bottomMargin = 60,
-  } = opts;
+  const { size = 10.5, lineH = 16, topMargin = 40, bottomMargin = 60 } = opts;
+
   const pageH = doc.internal.pageSize.getHeight();
   const yLimit = pageH - bottomMargin;
 
   doc.setFont('helvetica','normal');
   doc.setFontSize(size);
 
-  // Partimos por párrafos
-  const paras = String(text).split(/\n\s*\n/);
+  // ====== Config de detección ES/EN (FUERA de drawBoldLine) ======
+  const AREAS_ES = [
+    'Propósito y estrategia',
+    'Liderazgo y gobernanza',
+    'Cultura y bienestar',
+    'Aprendizaje e innovación',
+    'Procesos y tecnología',
+    'Sostenibilidad e impacto'
+  ];
+  const AREAS_EN_RAW = [
+    'Purpose & Strategy',
+    'Leadership & Governance',
+    'Culture & Wellbeing',
+    'Learning & Innovation',
+    'Processes & Technology',
+    'Sustainability & Impact'
+  ];
+  const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const toFlexibleEN = s => esc(s)
+    .replace(/\\s*&\\s*/i, '\\s*(?:&|and)\\s*')
+    .replace(/Wellbeing/i, 'Well[- ]?being'); // Wellbeing o Well-being
+  const AREAS_EN_FLEX = AREAS_EN_RAW.map(toFlexibleEN);
+  const AREAS_ALT = [...AREAS_ES.map(esc), ...AREAS_EN_FLEX].join('|');
 
-  // Helpers para líneas con "etiqueta en bold + cuerpo normal"
+  // 1) En|In <Área> — “insight.” resto
+  const AREA_RX = new RegExp(
+    `^((?:En|In)\\s+(${AREAS_ALT}))\\s+[—-]\\s+[“"]?([^”"]+)[”"]?\\.?\\s*(.*)$`
+  );
+  // 2) Oportunidades prioritarias / Priority opportunities
+  const OPORT_RX = /^(Oportunidades prioritarias\.|Priority opportunities\.)\s*(.*)$/;
+  // 3) Fortalezas clave / Key strengths
+  const FORTC_RX = /^(Fortalezas clave\.|Key strengths\.)\s*(.*)$/;
+  // 4) <Área> — “insight.” resto (dentro de fortalezas)
+  const FORT_AREA_RX = new RegExp(
+    `^(${AREAS_ALT})\\s+[—-]\\s+[“"]?([^”"]+)[”"]?\\.?\\s*(.*)$`
+  );
+  // 5) (opcional) Fortaleza|Strength – <Área> — “insight.” resto
+  const FORTL_RX = new RegExp(
+    `^((?:Fortaleza|Strength)\\s+[–-]\\s+(${AREAS_ALT}))\\s+[—-]\\s+[“"]?([^”"]+)[”"]?\\.?\\s*(.*)$`
+  );
+
+  // ====== Helper para imprimir etiqueta en bold + cuerpo ======
   const drawBoldLine = (label, body) => {
     if (y > yLimit) { doc.addPage(); y = topMargin; }
-    // etiqueta (bold) + el resto de la línea
     doc.setFont('helvetica','bold');
     const labelW = doc.getTextWidth(label);
     const firstLineW = Math.max(0, maxW - labelW - 6);
 
-   // --- LISTAS DE ÁREAS (ES/EN) ---
-const AREAS_ES = [
-  'Propósito y estrategia',
-  'Liderazgo y gobernanza',
-  'Cultura y bienestar',
-  'Aprendizaje e innovación',
-  'Procesos y tecnología',
-  'Sostenibilidad e impacto'
-];
-
-// En inglés permitimos & o "and", y wellbeing con/ sin guion
-const AREAS_EN_RAW = [
-  'Purpose & Strategy',
-  'Leadership & Governance',
-  'Culture & Wellbeing',
-  'Learning & Innovation',
-  'Processes & Technology',
-  'Sustainability & Impact'
-];
-
-// Escapa para regex
-const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-// Normaliza variaciones EN: "&" o "and", "Well-being"/"Wellbeing"
-const toFlexibleEN = s => esc(s)
-  .replace(/\\s*&\\s*/i, '\\s*(?:&|and)\\s*')
-  .replace(/Wellbeing/i, 'Well[- ]?being'); // acepta Wellbeing / Well-being
-
-const AREAS_EN_FLEX = AREAS_EN_RAW.map(toFlexibleEN);
-
-// Alternativas ES + EN en un solo patrón
-const AREAS_ALT = [
-  ...AREAS_ES.map(esc),
-  ...AREAS_EN_FLEX
-].join('|');
-
-// 1) "En|In <Área> — “Insight.” resto"
-const AREA_RX = new RegExp(
-  `^((?:En|In)\\s+(${AREAS_ALT}))\\s+[—-]\\s+[“"]?([^”"]+)[”"]?\\.?\\s*(.*)$`
-);
-
-// 2) Encabezados simples ES/EN
-const OPORT_RX = /^(Oportunidades prioritarias\.|Priority opportunities\.)\s*(.*)$/;
-const FORTC_RX = /^(Fortalezas clave\.|Key strengths\.)\s*(.*)$/;
-
-// 3) Dentro de Fortalezas: "<Área> — “Insight.” resto" (sin "Fortaleza – …" / "Strength – …")
-const FORT_AREA_RX = new RegExp(
-  `^(${AREAS_ALT})\\s+[—-]\\s+[“"]?([^”"]+)[”"]?\\.?\\s*(.*)$`
-);
-
-// 4) (Opcional) Formatos con prefijo "Fortaleza – …" o "Strength – …"
-const FORTL_RX = new RegExp(
-  `^((?:Fortaleza|Strength)\\s+[–-]\\s+(${AREAS_ALT}))\\s+[—-]\\s+[“"]?([^”"]+)[”"]?\\.?\\s*(.*)$`
-);
-
-    // Primer renglón del cuerpo que cabe a la derecha de la etiqueta
     doc.setFont('helvetica','normal');
-    const firstSlice = doc.splitTextToSize(String(body||''), firstLineW);
+    const firstSlice = doc.splitTextToSize(String(body || ''), firstLineW);
     const firstLine = firstSlice.shift() || '';
 
-    // Dibuja etiqueta y primer trozo
     doc.setFont('helvetica','bold'); doc.text(label, x, y);
     doc.setFont('helvetica','normal'); doc.text(firstLine, x + labelW + 6, y);
     y += lineH;
 
-    // Dibuja el resto del cuerpo en renglones siguientes
     firstSlice.forEach(line => {
       if (y > yLimit) { doc.addPage(); y = topMargin; }
       doc.text(line, x, y);
       y += lineH;
     });
-    y += 8; // espacio después del párrafo
+    y += 8;
   };
 
-  // Reglas de detección (ES). Si usas EN, duplica con los textos en inglés.
-  const AREA_RX = /^(En\s+(Cultura y bienestar|Sostenibilidad e impacto|Liderazgo y gobernanza))\s+[—-]\s+“?([^”"]+)”?\.\s*(.*)$/;
-  const OPORT_RX = /^(Oportunidades prioritarias\.)\s*(.*)$/;
-  const FORTC_RX = /^(Fortalezas clave\.)\s*(.*)$/;
-  const FORTL_RX = /^(Fortaleza\s+[–-]\s+[^—-]+)\s+[—-]\s+“?([^”"]+)”?\.\s*(.*)$/;
-
+  // ====== Renderizado párrafo por párrafo ======
+  const paras = String(text).split(/\n\s*\n/);
   for (let p of paras) {
     p = p.trim();
     if (!p) { y += 8; continue; }
 
-
     // 1) Oportunidades prioritarias / Priority opportunities
-let m = p.match(OPORT_RX);
-if (m) { drawBoldLine(m[1], m[2]); continue; }
+    let m = p.match(OPORT_RX);
+    if (m) { drawBoldLine(m[1], m[2]); continue; }
 
-// 2) "En|In <Área> — “...”"
-m = p.match(AREA_RX);
-if (m) {
-  const etiqueta = `${m[1]} — “${m[3]}.”`;
-  const cuerpo   = m[4] || '';
-  drawBoldLine(etiqueta, cuerpo);
-  continue;
-}
+    // 2) En|In <Área> — “…” (en secciones de oportunidades)
+    m = p.match(AREA_RX);
+    if (m) {
+      const etiqueta = `${m[1]} — “${m[3]}.”`;
+      const cuerpo   = m[4] || '';
+      drawBoldLine(etiqueta, cuerpo);
+      continue;
+    }
 
-// 3) Fortalezas clave / Key strengths
-m = p.match(FORTC_RX);
-if (m) { drawBoldLine(m[1], m[2]); continue; }
+    // 3) Fortalezas clave / Key strengths
+    m = p.match(FORTC_RX);
+    if (m) { drawBoldLine(m[1], m[2]); continue; }
 
-// 4) Dentro de Fortalezas: "<Área> — “...”"
-m = p.match(FORT_AREA_RX);
-if (m) {
-  const etiqueta = `${m[1]} — “${m[2]}.”`;
-  const cuerpo   = m[3] || '';
-  drawBoldLine(etiqueta, cuerpo);
-  continue;
-}
+    // 4) <Área> — “…” (líneas de fortalezas por área)
+    m = p.match(FORT_AREA_RX);
+    if (m) {
+      const etiqueta = `${m[1]} — “${m[2]}.”`;
+      const cuerpo   = m[3] || '';
+      drawBoldLine(etiqueta, cuerpo);
+      continue;
+    }
 
-// 5) (Opcional) "Fortaleza – <Área> — …" / "Strength – <Área> — …"
-m = p.match(FORTL_RX);
-if (m) {
-  const etiqueta = `${m[1]} — “${m[3]}.”`;
-  const cuerpo   = m[4] || '';
-  drawBoldLine(etiqueta, cuerpo);
-  continue;
-}
+    // 5) (opcional) Fortaleza|Strength – <Área> — “…”
+    m = p.match(FORTL_RX);
+    if (m) {
+      const etiqueta = `${m[1]} — “${m[3]}.”`;
+      const cuerpo   = m[4] || '';
+      drawBoldLine(etiqueta, cuerpo);
+      continue;
+    }
 
+    // 6) Párrafo normal
+    const lines = doc.splitTextToSize(p, maxW);
+    for (const line of lines) {
+      if (y > yLimit) { doc.addPage(); y = topMargin; }
+      doc.text(line, x, y);
+      y += lineH;
+    }
     y += 8;
   }
+
   return y;
 }
+
 
 
 
