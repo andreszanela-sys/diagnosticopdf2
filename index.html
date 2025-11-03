@@ -882,57 +882,84 @@ const resumenLimpio = stripDanglingInitials(
 
    // === Inserción opcional de imágenes (si Velo las mandó) ===
        
-   // === Inserción robusta de imagen COSTOS ===
-    if (data.imagenes && data.imagenes.costos) {
-    const pageW = doc.internal.pageSize.getWidth();
-    const pageH = doc.internal.pageSize.getHeight();
-    const left = 40, right = 40, top = 40, bottom = 60;
-    const maxW = Math.min(520, pageW - left - right);
+   // === Inserción de gráfica COSTOS con depuración + conversión a JPEG ===
+if (data.imagenes?.costos) {
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const left = 40, right = 40, top = 40, bottom = 60;
+  const maxW = Math.min(520, pageW - left - right);
 
-    // 1) Normaliza dataURL (acepta con/sin prefijo)
-    let dataURL = String(data.imagenes.costos || '');
-    if (!/^data:image\/png;base64,/.test(dataURL)) {
-        // si vino “raw” en base64, prepón el MIME
-        dataURL = 'data:image/png;base64,' + dataURL.replace(/^,+/, '');
-    }
+  // Datos de origen
+  const srcDataURL = String(data.imagenes.costos || '');
+  const srcW = Number(data.imagenes.costosW || 0) || 1644;
+  const srcH = Number(data.imagenes.costosH || 0) || 1024;
+  const ar = srcW / srcH || (16/9);
 
-    // 2) Mantén proporción con los w/h reportados
-    const srcW = Number(data.imagenes.costosW || 0);
-    const srcH = Number(data.imagenes.costosH || 0);
-    const ar = (srcW > 0 && srcH > 0) ? (srcW / srcH) : (16/9);
+  const imgW = maxW;
+  const imgH = Math.round(imgW / ar);
 
-    const imgW = maxW;
-    const imgH = Math.round(imgW / ar);
+  // Salto de página si no cabe
+  if ((y + imgH) > (pageH - bottom)) {
+    doc.addPage();
+    if (doc.setTextColor) doc.setTextColor(0,0,0);
+    y = top;
+  }
 
-    // 3) Salto de página si no cabe
-    if (y + imgH > pageH - bottom) { 
-        doc.addPage(); 
-        if (doc.setTextColor) doc.setTextColor(0,0,0);
-        y = top; 
-    }
+  // ❶ Marco de depuración (para verificar coordenadas)
+  doc.setDrawColor(200);
+  doc.setLineWidth(0.5);
+  doc.rect(left - 1, y - 1, imgW + 2, imgH + 2);        // borde fino
+  doc.setFont('helvetica','italic'); doc.setFontSize(8);
+  doc.text('(gráfica aquí)', left, y - 6);
 
-    // 4) addImage con reintentos y logs
-    const x = left;
+  // ❷ Normaliza a dataURL PNG con prefijo (si hiciera falta)
+  let pngURL = srcDataURL.startsWith('data:image/')
+    ? srcDataURL
+    : 'data:image/png;base64,' + srcDataURL.replace(/^,+/,'');
+
+  // ❸ Convierte PNG ➜ JPEG a la resolución final (sin alpha)
+  const pngToJpegAtSize = (pngUrl, w, h, quality=0.92) => new Promise((resolve, reject) => {
     try {
-        // a) auto-detect
-        doc.addImage(dataURL, undefined, x, y, imgW, imgH);
-    } catch (e1) {
+      const img = new Image();
+      img.onload = () => {
         try {
-        // b) forzar PNG
-        doc.addImage(dataURL, 'PNG', x, y, imgW, imgH, undefined, 'FAST');
-        } catch (e2) {
-        try {
-            // c) modo BASE64 crudo, por si el prefijo molesta
-            const base64 = dataURL.split(',')[1] || dataURL;
-            doc.addImage(base64, 'PNG', x, y, imgW, imgH, undefined, 'FAST');
-        } catch (e3) {
-            console.error('[PDF] addImage falló:', { e1, e2, e3 });
-        }
-        }
-    }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d', {alpha:false});
+          // fondo blanco para eliminar transparencia
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, w, h);
+          // dibuja escalando al tamaño final del PDF
+          ctx.drawImage(img, 0, 0, w, h);
+          const jpegURL = canvas.toDataURL('image/jpeg', quality);
+          resolve(jpegURL);
+        } catch (err) { reject(err); }
+      };
+      img.onerror = reject;
+      img.crossOrigin = 'anonymous'; // seguro si es dataURL
+      img.src = pngUrl;
+    } catch (e) { reject(e); }
+  });
 
-    y += imgH + 12;
+  try {
+    // ❹ JPEG final del tamaño que realmente vamos a colocar
+    const jpegURL = await pngToJpegAtSize(pngURL, imgW, imgH, 0.92);
+
+    // ❺ Inserta JPEG (tipo explícito)
+    doc.addImage(jpegURL, 'JPEG', left, y, imgW, imgH, undefined, 'FAST');
+  } catch (e) {
+    console.error('[PDF] Falló conversión/insert JPEG, reintentando PNG directo:', e);
+    try {
+      // último recurso: PNG directo
+      doc.addImage(pngURL, 'PNG', left, y, imgW, imgH, undefined, 'FAST');
+    } catch (e2) {
+      console.error('[PDF] addImage PNG también falló:', e2);
     }
+  }
+
+  y += imgH + 12;
+}
+
 
    
    
