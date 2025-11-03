@@ -797,7 +797,7 @@ const resumenLimpio = stripDanglingInitials(
         //const bottom= 60;   // mismo margen inferior que usas
         const maxW  = Math.min(520, pageW - left - right);
         let imgW = maxW;
-        const imgH  = Math.round(maxW * 9/16);
+        let imgH = Math.round(maxW * 9/16);
 
         const srcW = Number(data.imagenes.costosW || 0);
         const srcH = Number(data.imagenes.costosH || 0);
