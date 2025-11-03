@@ -881,7 +881,63 @@ const resumenLimpio = stripDanglingInitials(
 
 
    // === Inserción opcional de imágenes (si Velo las mandó) ===
-        if (data.imagenes?.costos) {
+       
+   // === Inserción robusta de imagen COSTOS ===
+    if (data.imagenes && data.imagenes.costos) {
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const left = 40, right = 40, top = 40, bottom = 60;
+    const maxW = Math.min(520, pageW - left - right);
+
+    // 1) Normaliza dataURL (acepta con/sin prefijo)
+    let dataURL = String(data.imagenes.costos || '');
+    if (!/^data:image\/png;base64,/.test(dataURL)) {
+        // si vino “raw” en base64, prepón el MIME
+        dataURL = 'data:image/png;base64,' + dataURL.replace(/^,+/, '');
+    }
+
+    // 2) Mantén proporción con los w/h reportados
+    const srcW = Number(data.imagenes.costosW || 0);
+    const srcH = Number(data.imagenes.costosH || 0);
+    const ar = (srcW > 0 && srcH > 0) ? (srcW / srcH) : (16/9);
+
+    const imgW = maxW;
+    const imgH = Math.round(imgW / ar);
+
+    // 3) Salto de página si no cabe
+    if (y + imgH > pageH - bottom) { 
+        doc.addPage(); 
+        if (doc.setTextColor) doc.setTextColor(0,0,0);
+        y = top; 
+    }
+
+    // 4) addImage con reintentos y logs
+    const x = left;
+    try {
+        // a) auto-detect
+        doc.addImage(dataURL, undefined, x, y, imgW, imgH);
+    } catch (e1) {
+        try {
+        // b) forzar PNG
+        doc.addImage(dataURL, 'PNG', x, y, imgW, imgH, undefined, 'FAST');
+        } catch (e2) {
+        try {
+            // c) modo BASE64 crudo, por si el prefijo molesta
+            const base64 = dataURL.split(',')[1] || dataURL;
+            doc.addImage(base64, 'PNG', x, y, imgW, imgH, undefined, 'FAST');
+        } catch (e3) {
+            console.error('[PDF] addImage falló:', { e1, e2, e3 });
+        }
+        }
+    }
+
+    y += imgH + 12;
+    }
+
+   
+   
+   
+   /* if (data.imagenes?.costos) {
         const pageW = doc.internal.pageSize.getWidth();
         const pageH = doc.internal.pageSize.getHeight();
         const left  = 40, right = 40, top = 40, bottom = 60;
@@ -902,7 +958,7 @@ const resumenLimpio = stripDanglingInitials(
         if (y + imgH > pageH - bottom) { doc.addPage(); y = top; }
         doc.addImage(data.imagenes.costos, 'PNG', left, y, imgW, imgH);
         y += imgH + 12;
-        }
+        }*/
 
         // ⬇️ si no cabe, manda a la página siguiente
         /*if (y + imgH > pageH - bottom) { 
