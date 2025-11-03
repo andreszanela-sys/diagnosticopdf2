@@ -329,49 +329,6 @@ function normalizeText(input){
 
 
 
-
-
-
-
-// ——— Dibuja texto largo con salto de página automático ———
-// Usa el mismo ancho (maxW) que ya usas en la página 1 (520)
-/*function drawLongTextPaged(doc, text, x, y, maxW, opts = {}){
-  const {
-    font = 'helvetica',
-    style = 'normal',
-    size = 10.5,
-    lineH = 14,
-    spaceAfter = 0,
-    topMargin = 40,      // M_TOP
-    bottomMargin = 60,   // pie de página
-  } = opts;
-
-  const pageH = doc.internal.pageSize.getHeight();
-  const yLimit = pageH - bottomMargin;
-
-  doc.setFont(font, style);
-  doc.setFontSize(size);
-
-  // Partimos en párrafos por línea en blanco
-  const paragraphs = String(text).split(/\n\s*\n/);
-
-  for (const p of paragraphs){
-    const lines = doc.splitTextToSize(p, maxW);
-    for (const line of lines){
-      if (y > yLimit){
-        doc.addPage();
-        y = topMargin;
-        doc.setFont(font, style);
-        doc.setFontSize(size);
-      }
-      doc.text(line, x, y);
-      y += lineH;
-    }
-    y += spaceAfter; // espacio entre párrafos
-  }
-  return y;
-}*/
-
 function renderAnalisisConNegritas(doc, text, x, y, maxW, opts = {}) {
   const { size = 10.5, lineH = 16, topMargin = 40, bottomMargin = 60 } = opts;
 
@@ -664,7 +621,7 @@ y = bump(y, GAP.lg);
 
   // Insight / lectura humana
     doc.setFont('helvetica','normal');
-    doc.setFontSize(11); // antes era 9
+    doc.setFontSize(10); // antes era 9
     const insight = data.insightNivel || '';
     const insightLines = splitLines(doc, insight, 520);
     y = drawParagraph(doc, insight, M_LEFT, y, 520, 'helvetica', 'normal', 11, 16, GAP.sm);
@@ -676,16 +633,16 @@ y = bump(y, GAP.lg);
 
     // Si aún no tienes “rows” construidas aquí, calcula el recuperable total a partir de las áreas:
     const NOMBRES_ES = { proposito:'Propósito y estrategia', liderazgo:'Liderazgo y gobernanza', cultura:'Cultura y bienestar', aprendizaje:'Aprendizaje e innovación', procesos:'Procesos y tecnología', sostenibilidad:'Sostenibilidad e impacto' };
-    const NOMBRES_EN = { proposito:'Purpose & Strategy', leadership:'Leadership & Governance', cultura:'Culture & Wellbeing', aprendizaje:'Learning & Innovation', procesos:'Processes & Technology', sostenibilidad:'Sustainability & Impact' };
+    const NOMBRES_EN = { proposito:'Purpose & Strategy', liderazgo:'Leadership & Governance', cultura:'Culture & Wellbeing', aprendizaje:'Learning & Innovation', procesos:'Processes & Technology', sostenibilidad:'Sustainability & Impact' };
 
     // Calcula recuperable total (ya lo tenías)
-    let recuperableTotalN = 0;
+    /*let recuperableTotalN = 0;
     (data.areasDetalle || []).forEach(a => {
     const avg = Number(a.promedio || 0);
     const costN = moneyToNumber(a.costoUSD);
     const rate  = recRateFromScore(avg);
     recuperableTotalN += Math.round(costN * rate);
-    });
+    });*/
 
 // ===== Resumen ejecutivo con interpretación (antes de "Nivel general organizacional") =====
 
@@ -775,8 +732,8 @@ y = bump(y, GAP.lg);
 
     const recLinea = (
     lang==='en'
-        ? `Recoverable (potential): ${fmtMoney(recuperableTotalN, lang)}.`
-        : `Recuperable (potencial): ${fmtMoney(recuperableTotalN, lang)}.`
+        ? `Recoverable (potential): ${fmtMoney(recTotalNum, lang)}.`
+        : `Recuperable (potencial): ${fmtMoney(recTotalNum, lang)}.`
     );
     doc.setFont('helvetica','bold'); doc.setFontSize(10);
     y = drawParagraph(doc, recLinea, M_LEFT, y, 520, 'helvetica', 'bold', 10, 12, 8);
@@ -829,6 +786,26 @@ const resumenLimpio = stripDanglingInitials(
   size: 10.5, lineH: 16, topMargin: M_TOP, bottomMargin: 60
    });
 
+
+   // === Inserción opcional de imágenes (si Velo las mandó) ===
+        if (data.imagenes?.costos) {
+        const pageW = doc.internal.pageSize.getWidth();
+        const maxW  = Math.min(520, pageW - 2*40); // 520 coincide con tu ancho de texto
+        const imgH  = Math.round(maxW * 9/16);     // ajusta relación si tu canvas no es 16:9
+        doc.addImage(data.imagenes.costos, 'PNG', 40, y, maxW, imgH);
+        y += imgH + 12;
+        }
+
+       /* if (data.imagenes?.desconexion) {
+        const pageW = doc.internal.pageSize.getWidth();
+        const maxW  = Math.min(520, pageW - 2*40);
+        const imgH  = Math.round(maxW * 9/16);
+        const pageH = doc.internal.pageSize.getHeight();
+        // salto de página si no cabe
+        if (y + imgH > pageH - 60) { doc.addPage(); y = 40; }
+        doc.addImage(data.imagenes.desconexion, 'PNG', 40, y, maxW, imgH);
+        y += imgH + 12;
+        }*/
 
 
   // El campo analisisNivel es la narrativa larga que tú armaste (parts.htmlFull),
