@@ -790,11 +790,36 @@ const resumenLimpio = stripDanglingInitials(
    // === Inserción opcional de imágenes (si Velo las mandó) ===
         if (data.imagenes?.costos) {
         const pageW = doc.internal.pageSize.getWidth();
-        const maxW  = Math.min(520, pageW - 2*40); // 520 coincide con tu ancho de texto
-        const imgH  = Math.round(maxW * 9/16);     // ajusta relación si tu canvas no es 16:9
-        doc.addImage(data.imagenes.costos, 'PNG', 40, y, maxW, imgH);
+        const pageH = doc.internal.pageSize.getHeight();
+        const left  = 40, right = 40, top = 40, bottom = 60;
+
+        //const top   = 40;   // mismo margen superior que usas
+        //const bottom= 60;   // mismo margen inferior que usas
+        const maxW  = Math.min(520, pageW - left - right);
+        let imgW = maxW;
+        const imgH  = Math.round(maxW * 9/16);
+
+        const srcW = Number(data.imagenes.costosW || 0);
+        const srcH = Number(data.imagenes.costosH || 0);
+        if (srcW > 0 && srcH > 0){
+            const ar = srcW / srcH;           // p.ej. 800/400 = 2.0
+            imgH = Math.round(imgW / ar);     // ← altura real para ese ancho
+        }
+
+        if (y + imgH > pageH - bottom) { doc.addPage(); y = top; }
+        doc.addImage(data.imagenes.costos, 'PNG', left, y, imgW, imgH);
         y += imgH + 12;
         }
+
+        // ⬇️ si no cabe, manda a la página siguiente
+        /*if (y + imgH > pageH - bottom) { 
+            doc.addPage(); 
+            y = top; 
+        }
+
+        doc.addImage(data.imagenes.costos, 'PNG', 40, y, maxW, imgH);
+        y += imgH + 12;
+        }*/
 
        /* if (data.imagenes?.desconexion) {
         const pageW = doc.internal.pageSize.getWidth();
