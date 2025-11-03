@@ -266,14 +266,103 @@ function drawExecutiveSummary(doc, {x, y, w, lang, nivelGeneral, promedioGeneral
 
 function drawParagraph(doc, text, x, y, maxW, font='helvetica', style='normal', size=10.5, lineH=16, spaceAfter=GAP.md){
   doc.setFont(font, style); doc.setFontSize(size);
+
+    const pageH  = doc.internal.pageSize.getHeight();
+    const top    = 40;   // usa tu M_TOP si lo prefieres
+    const bottom = 60;
+    const yLimit = pageH - bottom;
+
   const lines = doc.splitTextToSize(String(text||''), maxW);
-  doc.text(lines, x, y);
-  return y + lines.length*lineH + spaceAfter;
+  
+    for (const line of lines){
+        if (y > yLimit){
+        doc.addPage();
+        if (doc.setTextColor) doc.setTextColor(0,0,0); // reasegura color
+        doc.setFont(font, style); 
+        doc.setFontSize(size);
+        y = top;
+        }
+        doc.text(line, x, y);
+        y += lineH;
+    }
+    return y + spaceAfter;
+    
+
+  //doc.text(lines, x, y);
+  //return y + lines.length*lineH + spaceAfter;
 }
 
 
-// Helper: etiqueta en bold + texto normal con salto de línea correcto
 function drawBoldLabelThenText(doc, label, text, x, y, maxW, gap = 6, size = 10, lineH = 12) {
+  const pageH  = doc.internal.pageSize.getHeight();
+  const top    = 40;   // usa tu M_TOP si prefieres
+  const bottom = 60;
+  const yLimit = pageH - bottom;
+
+  const setBold = () => { doc.setFont('helvetica','bold');   doc.setFontSize(size); };
+  const setBody = () => { doc.setFont('helvetica','normal'); doc.setFontSize(size); };
+  const ensureInk = () => { if (doc.setTextColor) doc.setTextColor(0,0,0); };
+
+  const br = () => {                // salto de página seguro
+    doc.addPage();
+    ensureInk();
+    y = top;
+  };
+
+  const needsBreak = (h = lineH) => (y + h > yLimit);
+
+  const safeText = String(text ?? '');
+  const safeLabel = String(label ?? '');
+
+  // 1) Si la etiqueta es demasiado ancha para compartir línea, la apilamos
+  setBold();
+  const labelW = doc.getTextWidth(safeLabel);
+  const shareLine = (labelW + gap < maxW * 0.66); // heurística: cabe razonable
+
+  if (!shareLine) {
+    // (A) Imprime etiqueta sola en una línea
+    if (needsBreak()) br();
+    setBold(); doc.text(safeLabel, x, y); y += lineH;
+
+    // (B) Imprime el cuerpo con paginación línea por línea
+    setBody();
+    const lines = doc.splitTextToSize(safeText, maxW);
+    for (const line of lines) {
+      if (needsBreak()) br(), setBody();
+      doc.text(line, x, y);
+      y += lineH;
+    }
+    return y;
+  }
+
+  // 2) Etiqueta y primer trozo del cuerpo en la misma línea
+  const firstLineW = Math.max(0, maxW - labelW - gap);
+  setBody();
+  const chunks = doc.splitTextToSize(safeText, firstLineW);
+  const first = chunks.shift() || '';
+
+  if (needsBreak()) br();
+  setBold(); doc.text(safeLabel, x, y);
+  setBody(); doc.text(first, x + labelW + gap, y);
+  y += lineH;
+
+  // 3) Resto del cuerpo, línea por línea con salto seguro
+  for (const line of chunks) {
+    if (needsBreak()) br(), setBody();
+    doc.text(line, x, y);
+    y += lineH;
+  }
+
+  return y;
+}
+
+
+
+
+// Helper: etiqueta en bold + texto normal con salto de línea correcto
+/*function drawBoldLabelThenText(doc, label, text, x, y, maxW, gap = 6, size = 10, lineH = 12) {
+  
+  
   doc.setFont('helvetica','bold');  doc.setFontSize(size);
   const labelW = doc.getTextWidth(label);
 
@@ -299,7 +388,7 @@ function drawBoldLabelThenText(doc, label, text, x, y, maxW, gap = 6, size = 10,
   });
 
   return yy; // devuelve el siguiente y disponible
-}
+}*/
 
 
 // ——— Normaliza el texto que viene del HTML (quita NBSPs y espacios finos) ———
@@ -334,6 +423,8 @@ function renderAnalisisConNegritas(doc, text, x, y, maxW, opts = {}) {
 
   const pageH = doc.internal.pageSize.getHeight();
   const yLimit = pageH - bottomMargin;
+
+  const ensureInk = () => { if (doc.setTextColor) doc.setTextColor(0,0,0); };
 
   doc.setFont('helvetica','normal');
   doc.setFontSize(size);
@@ -392,7 +483,7 @@ const FORTL_RX = new RegExp(
 
   // ====== Helper para imprimir etiqueta en bold + cuerpo ======
   const drawBoldLine = (label, body) => {
-    if (y > yLimit) { doc.addPage(); y = topMargin; }
+    if (y > yLimit) { doc.addPage(); ensureInk(); y = topMargin; }
     doc.setFont('helvetica','bold');
     const labelW = doc.getTextWidth(label);
     const firstLineW = Math.max(0, maxW - labelW - 6);
@@ -406,7 +497,7 @@ const FORTL_RX = new RegExp(
     y += lineH;
 
     firstSlice.forEach(line => {
-      if (y > yLimit) { doc.addPage(); y = topMargin; }
+      if (y > yLimit) { doc.addPage(); ensureInk(); y = topMargin; }
       doc.text(line, x, y);
       y += lineH;
     });
@@ -457,7 +548,7 @@ const FORTL_RX = new RegExp(
     // 6) Párrafo normal
     const lines = doc.splitTextToSize(p, maxW);
     for (const line of lines) {
-      if (y > yLimit) { doc.addPage(); y = topMargin; }
+      if (y > yLimit) { doc.addPage(); ensureInk(); y = topMargin; }
       doc.text(line, x, y);
       y += lineH;
     }
@@ -500,6 +591,8 @@ async function generarPDFyDescargar(data){
     unit: 'pt',   // puntos
     format: 'letter' // o 'a4', según tu pdf original
   });
+
+  if (doc.setTextColor) doc.setTextColor(0,0,0);
 
   // Margenes básicos
   const M_LEFT = 40;
