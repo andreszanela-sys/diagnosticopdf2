@@ -942,13 +942,19 @@ if (data.imagenes?.costos) {
   const srcH = Number(data.imagenes.costosH || 0) || 1024;
   const ar   = srcW > 0 && srcH > 0 ? (srcW / srcH) : (16/9);
 
+  const looksPNG  = /^data:image\/png/i.test(srcURL);
+  const looksJPEG = /^data:image\/jpe?g/i.test(srcURL);
+
   // 🔎 Log rápido (temporal)
-  console.log('[PDF] img costos head:', srcURL.slice(0, 32));
+  //console.log('[PDF] img costos head:', srcURL.slice(0, 32));
 
   // Normaliza prefijo: si llega sin "data:image/..."
   if (!/^data:image\//i.test(srcURL)) {
-    // por defecto asumimos JPEG (tu snapshot ya sale en JPEG)
+    // si no trae prefijo, asumimos JPEG (cambia a 'png' si tu snapshot real fuera PNG)
     srcURL = 'data:image/jpeg;base64,' + srcURL.replace(/^,+/, '');
+  } else {
+    // si trae prefijo pero pudiera venir con comas iniciales extrañas
+    srcURL = srcURL.replace(/^data:image\/(png|jpe?g);base64,+/i, (m) => m.replace(/,+$/, ''));
   }
 
   const imgW = maxW;
@@ -961,18 +967,35 @@ if (data.imagenes?.costos) {
     y = top;
   }
 
+  // Inserta imagen (fuerza formato para evitar autodetección errática)
+  try {
+    doc.addImage(
+      srcURL,
+      looksPNG ? 'PNG' : 'JPEG',   // si el prefijo era PNG, lo respetamos; si no, JPEG
+      left,
+      y,
+      imgW,
+      imgH,
+      undefined,
+      'FAST'
+    );
+    y += imgH + 12;
+  } catch (e) {
+    console.warn('[PDF] No se pudo insertar imagen de costos:', e);
+  }
+
   // Marco de depuración (temporal, para ver el hueco)
-  doc.setDrawColor(200); doc.setLineWidth(0.5);
-  doc.rect(left - 1, y - 1, imgW + 2, imgH + 2);
+  //doc.setDrawColor(200); doc.setLineWidth(0.5);
+  //doc.rect(left - 1, y - 1, imgW + 2, imgH + 2);
 
   // 👉 Fuerza el formato (evita autodetección errática en 2.5.1)
   // Si tu snapshot es JPEG, usa 'JPEG'. Si fuera PNG, cambia a 'PNG'.
-  doc.addImage(srcURL, 'JPEG', left, y, imgW, imgH, undefined, 'FAST');
+  //doc.addImage(srcURL, 'JPEG', left, y, imgW, imgH, undefined, 'FAST');
 
-  y += imgH + 12;
-} else {
-  console.warn('[PDF] No llegó data.imagenes.costos');
-}
+  //y += imgH + 12;
+    } else {
+    console.warn('[PDF] No llegó data.imagenes.costos');
+    }
 
 
 
