@@ -747,6 +747,18 @@ y = bump(y, GAP.lg);
     recTotalNum += Math.round(cost * recRateFromScore(avg));
     });
 
+    {
+  const pageH  = doc.internal.pageSize.getHeight();
+  const bottom = 60;
+  const needH  = 120; // alto mínimo estimado del bloque
+  if (y + needH > pageH - bottom) { doc.addPage(); if (doc.setTextColor) doc.setTextColor(0,0,0); y = M_TOP; }
+
+  // marco de depuración (temporal)
+  doc.setDrawColor(220); 
+  doc.rect(M_LEFT - 4, y, 520, 100); // caja de guía para ver dónde cae el bloque
+}
+
+
     // Dibuja el bloque
     y = drawExecutiveSummary(doc, {
     x: M_LEFT - 4,
@@ -917,18 +929,27 @@ const resumenLimpio = stripDanglingInitials(
 
    // === Inserción opcional de imágenes (si Velo las mandó) ===
        
+// === Inserción opcional de imágenes (si Velo las mandó) ===
 if (data.imagenes?.costos) {
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
   const left  = 40, right = 40, top = 40, bottom = 60;
-
-  const maxW = Math.min(520, pageW - left - right);
+  const maxW  = Math.min(520, pageW - left - right);
 
   // Datos de origen y tamaño
-  const srcURL = String(data.imagenes.costos || '');      // ← debe venir como data:image/jpeg;base64,...
-  const srcW   = Number(data.imagenes.costosW || 0) || 1644;
-  const srcH   = Number(data.imagenes.costosH || 0) || 1024;
-  const ar     = srcW > 0 && srcH > 0 ? (srcW / srcH) : (16/9);
+  let srcURL = String(data.imagenes.costos || '');
+  const srcW = Number(data.imagenes.costosW || 0) || 1644;
+  const srcH = Number(data.imagenes.costosH || 0) || 1024;
+  const ar   = srcW > 0 && srcH > 0 ? (srcW / srcH) : (16/9);
+
+  // 🔎 Log rápido (temporal)
+  console.log('[PDF] img costos head:', srcURL.slice(0, 32));
+
+  // Normaliza prefijo: si llega sin "data:image/..."
+  if (!/^data:image\//i.test(srcURL)) {
+    // por defecto asumimos JPEG (tu snapshot ya sale en JPEG)
+    srcURL = 'data:image/jpeg;base64,' + srcURL.replace(/^,+/, '');
+  }
 
   const imgW = maxW;
   const imgH = Math.round(imgW / ar);
@@ -940,11 +961,19 @@ if (data.imagenes?.costos) {
     y = top;
   }
 
-  // ⬇️ Inserta la imagen dejando que jsPDF autodecte (NO pases 'PNG'/'JPEG')
-  doc.addImage(srcURL, left, y, imgW, imgH);
+  // Marco de depuración (temporal, para ver el hueco)
+  doc.setDrawColor(200); doc.setLineWidth(0.5);
+  doc.rect(left - 1, y - 1, imgW + 2, imgH + 2);
+
+  // 👉 Fuerza el formato (evita autodetección errática en 2.5.1)
+  // Si tu snapshot es JPEG, usa 'JPEG'. Si fuera PNG, cambia a 'PNG'.
+  doc.addImage(srcURL, 'JPEG', left, y, imgW, imgH, undefined, 'FAST');
 
   y += imgH + 12;
+} else {
+  console.warn('[PDF] No llegó data.imagenes.costos');
 }
+
 
 
 
