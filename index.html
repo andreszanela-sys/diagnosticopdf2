@@ -811,8 +811,43 @@ y = bump(y, GAP.lg);
     // Dibujar tabla
     y = drawResultsTable(doc, { lang, x: M_LEFT, y, w: 520 }, rows);
 
-    // Línea “Costo oculto estimado” (abajo de la tabla)
+    // === Bloque final: Costo oculto + Recuperable (mantener juntas) ===
     const totalLinea = (
+    lang==='en'
+        ? `Estimated hidden cost: ${data.costoTotalUSD} per year.`
+        : `Costo oculto estimado: ${data.costoTotalUSD} al año.`
+    );
+
+    const recBlockNum = rows.reduce((acc, r) => acc + moneyToNumber(r.roiStr), 0); // ya lo calculaste arriba; usa ese si lo prefieres
+    const recLinea = (
+    lang==='en'
+        ? `Recoverable (potential): ${fmtMoney(recBlockNum, lang)}.`
+        : `Recuperable (potencial): ${fmtMoney(recBlockNum, lang)}.`
+    );
+
+    // Medimos líneas para evitar corte
+    doc.setFont('helvetica','bold'); doc.setFontSize(10);
+    const l1 = doc.splitTextToSize(totalLinea, 520);
+    const l2 = doc.splitTextToSize(recLinea, 520);
+    const pageH2 = doc.internal.pageSize.getHeight();
+    const bottom = 60;
+    const needH = l1.length*12 + l2.length*12 + 10; // 10pt de separación interna
+
+    if (y + needH > pageH2 - bottom) {
+    doc.addPage();
+    if (doc.setTextColor) doc.setTextColor(0,0,0);
+    y = M_TOP;
+    }
+
+    // Imprime bloque
+    l1.forEach(line => { doc.text(line, M_LEFT, y); y += 12; });
+    y += 4; // separación corta
+    l2.forEach(line => { doc.text(line, M_LEFT, y); y += 12; });
+    y += 8; // pequeño margen después del bloque
+
+
+    // Línea “Costo oculto estimado” (abajo de la tabla)
+    /*const totalLinea = (
     lang==='en'
         ? `Estimated hidden cost: ${data.costoTotalUSD} per year.`
         : `Costo oculto estimado: ${data.costoTotalUSD} al año.`
@@ -842,7 +877,7 @@ y = bump(y, GAP.lg);
     data.idioma==='en' ? 'Page 1' : 'Página 1',
     520,           // posición X (derecha)
     pageH - 32     // posición Y (32pt desde el borde inferior)
-    );
+    );*/
 
 
 
@@ -882,18 +917,18 @@ const resumenLimpio = stripDanglingInitials(
 
    // === Inserción opcional de imágenes (si Velo las mandó) ===
        
-// === Inserción robusta de la gráfica de COSTOS ===
 if (data.imagenes?.costos) {
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
-  const left = 40, right = 40, top = 40, bottom = 60;
+  const left  = 40, right = 40, top = 40, bottom = 60;
+
   const maxW = Math.min(520, pageW - left - right);
 
   // Datos de origen y tamaño
-  const srcURL = String(data.imagenes.costos || '');
-  const srcW = Number(data.imagenes.costosW || 0) || 1644;
-  const srcH = Number(data.imagenes.costosH || 0) || 1024;
-  const ar = srcW / srcH || (16/9);
+  const srcURL = String(data.imagenes.costos || '');      // ← debe venir como data:image/jpeg;base64,...
+  const srcW   = Number(data.imagenes.costosW || 0) || 1644;
+  const srcH   = Number(data.imagenes.costosH || 0) || 1024;
+  const ar     = srcW > 0 && srcH > 0 ? (srcW / srcH) : (16/9);
 
   const imgW = maxW;
   const imgH = Math.round(imgW / ar);
@@ -905,89 +940,12 @@ if (data.imagenes?.costos) {
     y = top;
   }
 
-  // Marco de depuración
-  doc.setDrawColor(200); doc.setLineWidth(0.5);
-  doc.rect(left - 1, y - 1, imgW + 2, imgH + 2);
-  doc.setFont('helvetica','italic'); doc.setFontSize(8);
-  doc.text('(gráfica aquí)', left, y - 6);
-
-  // Normaliza prefijo (por si llega sin "data:image/...")
-  const pngURL = srcURL.startsWith('data:image/')
-    ? srcURL
-    : 'data:image/png;base64,' + srcURL.replace(/^,+/,'');
-
-  console.log('[PDF] PNG len:', pngURL.length, 'head:', pngURL.slice(0,30), '...');
-
-  // INTENTO 1: reconstruir en canvas y pasar canvas directo a jsPDF
-  const drawFromCanvas = () => new Promise((resolve, reject) => {
-    try {
-      const img = new Image();
-      img.onload = () => {
-        try {
-          const c = document.createElement('canvas');
-          c.width = imgW; c.height = imgH;
-          const ctx = c.getContext('2d', {alpha: false});
-          ctx.fillStyle = '#FFFFFF';
-          ctx.fillRect(0,0,imgW,imgH);
-          ctx.drawImage(img, 0, 0, imgW, imgH);
-          // jsPDF acepta canvas directamente:
-          doc.addImage(c, 'PNG', left, y, imgW, imgH, undefined, 'FAST');
-          resolve();
-        } catch(e){ reject(e); }
-      };
-      img.onerror = reject;
-      img.crossOrigin = 'anonymous';
-      img.src = pngURL;
-    } catch(e){ reject(e); }
-  });
-
-  // INTENTO 3: convertir a JPEG (sin alpha) y añadir
-  const pngToJPEG = (url, w, h, quality=0.9) => new Promise((resolve, reject) => {
-    try {
-      const img = new Image();
-      img.onload = () => {
-        try {
-          const c = document.createElement('canvas');
-          c.width = w; c.height = h;
-          const ctx = c.getContext('2d', {alpha:false});
-          ctx.fillStyle = '#FFFFFF';
-          ctx.fillRect(0,0,w,h);
-          ctx.drawImage(img, 0, 0, w, h);
-          resolve(c.toDataURL('image/jpeg', quality));
-        } catch(e){ reject(e); }
-      };
-      img.onerror = reject;
-      img.crossOrigin = 'anonymous';
-      img.src = url;
-    } catch(e){ reject(e); }
-  });
-
-  try {
-    // 1) Canvas → addImage(canvas)
-    await drawFromCanvas();
-    console.log('[PDF] Insertada desde canvas ✔');
-  } catch(e1) {
-    console.warn('[PDF] Falló canvas→addImage, pruebo PNG directo:', e1?.message || e1);
-    try {
-      // 2) PNG directo
-      doc.addImage(pngURL, 'PNG', left, y, imgW, imgH, undefined, 'FAST');
-      console.log('[PDF] Insertada PNG directa ✔');
-    } catch(e2) {
-      console.warn('[PDF] Falló PNG directo, convierto a JPEG:', e2?.message || e2);
-      try {
-        // 3) JPEG sin alpha
-        const jpegURL = await pngToJPEG(pngURL, imgW, imgH, 0.9);
-        console.log('[PDF] JPEG len:', jpegURL.length, 'head:', jpegURL.slice(0,30), '...');
-        doc.addImage(jpegURL, 'JPEG', left, y, imgW, imgH, undefined, 'FAST');
-        console.log('[PDF] Insertada JPEG ✔');
-      } catch(e3) {
-        console.error('[PDF] Fallaron los 3 intentos de imagen :(', e3);
-      }
-    }
-  }
+  // ⬇️ Inserta la imagen dejando que jsPDF autodecte (NO pases 'PNG'/'JPEG')
+  doc.addImage(srcURL, left, y, imgW, imgH);
 
   y += imgH + 12;
 }
+
 
 
 
