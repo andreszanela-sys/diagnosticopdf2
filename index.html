@@ -76,7 +76,9 @@ function drawResultsTable(doc, {lang, x, y, w}, rows){
 
     // Col 2: Promedio
     tx = x + colW[0] + 6;
-    doc.text(`${r.avg} / 5`, tx, ty);
+    doc.text(fmtAvg(r.avg), tx, ty);
+
+    //doc.text(`${r.avg} / 5`, tx, ty);
 
     // Col 3: Costo
     tx += colW[1];
@@ -615,11 +617,14 @@ window.addEventListener('message', async (event) => {
 
   // sólo reaccionar a data válidos del diagnóstico
   if (data.type === 'datosInforme') {
+  try {
     await generarPDFyDescargar(data);
-
-    // Avisar de éxito de generación a Wix
     window.parent.postMessage({ type:'pdf-ok' }, '*');
+  } catch(err) {
+    console.error('[PDF] Error generando PDF:', err);
+    window.parent.postMessage({ type:'pdf-error', message: String(err && err.message || err) }, '*');
   }
+ }
 });
 
 
@@ -632,6 +637,18 @@ async function generarPDFyDescargar(data){
     unit: 'pt',   // puntos
     format: 'letter' // o 'a4', según tu pdf original
   });
+
+  // Validaciones suaves (no rompen el PDF; solo loguean)
+    if (!data || typeof data !== 'object') {
+    console.warn('[PDF] data vacío/indefinido en generarPDFyDescargar');
+    }
+    if (!Array.isArray(data.areasDetalle)) {
+    console.warn('[PDF] data.areasDetalle ausente o no es array');
+    }
+    if (data?.imagenes?.costos && typeof data?.imagenes?.costos !== 'string') {
+    console.warn('[PDF] imagen de costos no es string/base64');
+    }
+
 
   if (doc.setTextColor) doc.setTextColor(0,0,0);
 
@@ -1103,7 +1120,16 @@ const resumenLimpio = stripDanglingInitials(
 
   // descarga
   const fileName = generarNombreArchivo(data);
+  try {
+  // Primer intento: descarga directa
   doc.save(fileName);
+  // Aviso de éxito (ya lo mandas arriba, lo dejamos por compatibilidad)
+        window.parent.postMessage({ type:'pdf-ok' }, '*');
+        } catch(e) {
+        // Fallback: enviar bloburl al parent para forzar descarga desde el contexto principal
+        const href = doc.output('bloburl');
+        window.parent.postMessage({ type:'pdf-url', href, filename: fileName }, '*');
+        }
 }
 
 // Helpers para formatear texto:
@@ -1147,6 +1173,13 @@ function drawCostChartIfAny(doc, data, x, y, maxWidthPT) {
     const srcH    = Number(data?.imagenes?.costosH || 0) || 1024;
 
     const { dataURL, fmt } = toDataURLAndFormat(raw, hinted);
+    let finalFmt = fmt;
+    if (!finalFmt) {
+    const s = (raw||'').trim().replace(/\s+/g,'');
+    finalFmt = s.startsWith('iVBOR') ? 'PNG' : (s.startsWith('/9j/') ? 'JPEG' : 'JPEG');
+    }
+
+
     if (!dataURL) return y; // nada que dibujar
 
     const pageW  = doc.internal.pageSize.getWidth();
@@ -1181,7 +1214,8 @@ function drawCostChartIfAny(doc, data, x, y, maxWidthPT) {
     y += 20;
 
     // Imagen (usa el fmt REAL)
-    doc.addImage(dataURL, fmt || 'JPEG', x, y, drawW, drawH);
+    doc.addImage(dataURL, finalFmt, x, y, drawW, drawH);
+    //doc.addImage(dataURL, fmt || 'JPEG', x, y, drawW, drawH);
     y += drawH + 10;
 
     // Nota
