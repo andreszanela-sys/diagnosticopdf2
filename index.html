@@ -558,6 +558,44 @@ const FORTL_RX = new RegExp(
   return y;
 }
 
+// === Detección robusta del tipo de imagen según el base64 (sin header) ===
+function detectImageFormatFromBase64(b64){
+  if (!b64) return null;
+  const s = String(b64).trim().replace(/\s+/g,'');
+  // JPEG típicamente empieza con /9j/
+  if (s.startsWith('/9j/')) return 'JPEG';
+  // PNG típicamente empieza con iVBORw0KGgo
+  if (s.startsWith('iVBOR')) return 'PNG';
+  return null;
+}
+
+// === Normaliza lo que venga (con o sin header) y devuelve {dataURL, fmt} ===
+function toDataURLAndFormat(raw, hintedFmt){
+  if (!raw) return { dataURL:null, fmt:null };
+
+  let s = String(raw).trim();
+  // Quita espacios y saltos que rompen el dataURL
+  s = s.replace(/\s+/g,'');
+
+  // Si ya viene como dataURL completo:
+  if (/^data:image\/(png|jpe?g);base64,/i.test(s)){
+    const fmt = /png/i.test(s) ? 'PNG' : 'JPEG';
+    return { dataURL: s, fmt };
+  }
+
+  // Si viene "desnudo" (solo base64): detecta formato
+  const fmt = (hintedFmt && (hintedFmt.toUpperCase()==='PNG' || hintedFmt.toUpperCase()==='JPEG'))
+    ? hintedFmt.toUpperCase()
+    : (detectImageFormatFromBase64(s) || 'JPEG'); // por defecto JPEG
+
+  const prefix = (fmt === 'PNG')
+    ? 'data:image/png;base64,'
+    : 'data:image/jpeg;base64,';
+
+  return { dataURL: prefix + s.replace(/^,+/, ''), fmt };
+}
+
+
 
 
 
@@ -1038,76 +1076,55 @@ function stripDanglingInitials(s){
 }
 
 
-// === Inserta la gráfica de costos si existe, con salto de página seguro (pt/letter) ===
 function drawCostChartIfAny(doc, data, x, y, maxWidthPT) {
   try {
-    let src = data?.imagenes?.costos || '';
-    const srcW = Number(data?.imagenes?.costosW || 0);
-    const srcH = Number(data?.imagenes?.costosH || 0);
-    if (!src) return y; // nada que dibujar
+    const raw     = data?.imagenes?.costos || '';
+    const hinted  = data?.imagenes?.costosFmt || null; // si no lo mandas, no pasa nada
+    const srcW    = Number(data?.imagenes?.costosW || 0) || 1644;
+    const srcH    = Number(data?.imagenes?.costosH || 0) || 1024;
 
-    // Normaliza encabezado base64 si llega "desnudo"
-    if (!/^data:image\//i.test(src)) {
-      // si no trae prefijo, asumimos JPEG (cambia a PNG si tu snapshot es PNG)
-      src = 'data:image/jpeg;base64,' + String(src).replace(/^,+/, '');
-    } else {
-      // limpia comas redundantes tras base64,
-      src = src.replace(/^data:image\/(png|jpe?g);base64,+/i, (m) => m.replace(/,+$/, ''));
-    }
+    const { dataURL, fmt } = toDataURLAndFormat(raw, hinted);
+    if (!dataURL) return y; // nada que dibujar
 
-    const looksPNG  = /^data:image\/png/i.test(src);
-    const looksJPEG = /^data:image\/jpe?g/i.test(src);
-
-    const pageW = doc.internal.pageSize.getWidth();
-    const pageH = doc.internal.pageSize.getHeight();
-    const leftPad = 0; // ya pasas x con margen aplicado
-    const rightPad = 40;
+    const pageW  = doc.internal.pageSize.getWidth();
+    const pageH  = doc.internal.pageSize.getHeight();
     const bottom = 60;
 
-    const drawW = Math.min(maxWidthPT, pageW - (x + rightPad));
-    const aspect = (srcW > 0 && srcH > 0) ? (srcH / srcW) : (9/16); // alto/ancho
-    const drawH = Math.round(drawW * aspect);
+    const drawW  = Math.min(maxWidthPT, pageW - x - 40);
+    const aspect = (srcW > 0 && srcH > 0) ? (srcH/srcW) : (9/16);
+    const drawH  = Math.round(drawW * aspect);
 
-    // Título encima
+    // Reservas (título + imagen + nota)
     const titulo = (data?.idioma === 'en')
       ? 'Hidden Costs & Recoverable ROI'
       : 'Costos ocultos & ROI recuperable';
 
-    // ¿Cabe el bloque completo (título + imagen + nota)?
-    const headH = 20;
-    const note = (data?.idioma === 'en')
+    const note   = (data?.idioma === 'en')
       ? 'Bars: hidden cost by dimension · Line: realistically recoverable portion (12–18 months).'
       : 'Barras: costo oculto por dimensión · Línea: porcentaje recuperable (12–18 meses).';
-    const noteLines = doc.splitTextToSize(note, drawW);
-    const noteBlockH = noteLines.length * 12 + 6;
 
-    const needH = headH + drawH + noteBlockH + 6;
-    if (y + needH > pageH - bottom) {
+    doc.setFont('helvetica','bold'); doc.setFontSize(13);
+    const noteLines = doc.splitTextToSize(note, drawW);
+    const needH = 20 + drawH + (noteLines.length*12 + 6) + 6;
+
+    if (y + needH > pageH - bottom){
       doc.addPage();
       if (doc.setTextColor) doc.setTextColor(0,0,0);
-      y = 40; // margen superior estándar
+      y = 40;
     }
 
     // Título
-    doc.setFont('helvetica','bold'); doc.setFontSize(13);
-    doc.text(titulo, x + leftPad, y);
-    y += headH;
+    doc.text(titulo, x, y);
+    y += 20;
 
-    // Imagen
-    doc.addImage(
-      src,
-      looksPNG ? 'PNG' : 'JPEG',
-      x + leftPad, y,
-      drawW, drawH,
-      undefined,
-      'FAST'
-    );
+    // Imagen (usa el fmt REAL)
+    doc.addImage(dataURL, fmt || 'JPEG', x, y, drawW, drawH);
     y += drawH + 10;
 
     // Nota
     doc.setFont('helvetica','normal'); doc.setFontSize(10);
-    doc.text(noteLines, x + leftPad, y);
-    y += noteBlockH;
+    doc.text(noteLines, x, y);
+    y += (noteLines.length*12 + 6);
 
     return y;
   } catch (e) {
