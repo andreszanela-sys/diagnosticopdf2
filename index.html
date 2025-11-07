@@ -390,14 +390,7 @@ function drawBoldLabelThenText(doc, label, text, x, y, maxW, gap = 6, size = 10,
   return yy; // devuelve el siguiente y disponible
 }*/
 
-// Quita iniciales sueltas al inicio de línea (mismo criterio que en Velo, seguro para jsPDF)
-function stripDanglingInitials(s){
-  try {
-    return String(s).replace(/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]\s+(?=\p{L})/gmu, '');
-  } catch(_) {
-    return String(s);
-  }
-}
+
 
 
 
@@ -802,8 +795,8 @@ y = bump(y, GAP.lg);
   if (y + needH > pageH - bottom) { doc.addPage(); if (doc.setTextColor) doc.setTextColor(0,0,0); y = M_TOP; }
 
   // marco de depuración (temporal)
-  doc.setDrawColor(220); 
-  doc.rect(M_LEFT - 4, y, 520, 100); // caja de guía para ver dónde cae el bloque
+  //doc.setDrawColor(220); 
+  //doc.rect(M_LEFT - 4, y, 520, 100); // caja de guía para ver dónde cae el bloque
 }
 
 
@@ -974,10 +967,10 @@ const resumenLimpio = stripDanglingInitials(
   size: 10.5, lineH: 16, topMargin: M_TOP, bottomMargin: 60
    });
 
-   
+   y = drawCostChartIfAny(doc, data, M_LEFT, y, 520);
 
 // === SECCIÓN: Gráfica de Costos Ocultos y ROI (usa la imagen enviada desde Velo) ===
-try {
+/*try {
   const maxW = doc.internal.pageSize.getWidth() - (M_LEFT*2);
   const maxH = 260;        // alto máximo sugerido
   const raw   = data?.imagenes?.costos || null;         // puede venir con o sin dataURL
@@ -1035,7 +1028,7 @@ try {
 } catch(e){
   // no detengas el PDF si falla la imagen
   console.warn('No se pudo dibujar la gráfica de costos/ROI:', e);
-}
+}*/
 
 
 
@@ -1146,7 +1139,7 @@ function stripDanglingInitials(s){
 }
 
 
-/*function drawCostChartIfAny(doc, data, x, y, maxWidthPT) {
+function drawCostChartIfAny(doc, data, x, y, maxWidthPT) {
   try {
     const raw     = data?.imagenes?.costos || '';
     const hinted  = data?.imagenes?.costosFmt || null; // si no lo mandas, no pasa nada
@@ -1201,7 +1194,7 @@ function stripDanglingInitials(s){
     console.warn('[PDF] Error al dibujar gráfica de costos:', e);
     return y;
   }
-}*/
+}
 
 
 
