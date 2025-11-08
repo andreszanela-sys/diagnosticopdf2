@@ -984,7 +984,24 @@ const resumenLimpio = stripDanglingInitials(
   size: 10.5, lineH: 16, topMargin: M_TOP, bottomMargin: 60
    });
 
-   y = drawCostChartIfAny(doc, data, M_LEFT, y, 520);
+
+
+
+   // === NUEVA PÁGINA 3: Gráfica de Costos & ROI ===
+        doc.addPage();
+        if (doc.setTextColor) doc.setTextColor(0,0,0);
+        y = 40;                 // mismo M_TOP que usas arriba (M_TOP = 40)
+        doc.setFont('helvetica','bold'); 
+        doc.setFontSize(12);
+        doc.text(
+        data.idioma === 'en' ? 'Hidden Costs & Recoverable ROI' : 'Costos ocultos & ROI recuperable',
+        M_LEFT, y
+        );
+        y = bump(y, GAP.sm);
+        y = drawCostChartIfAny(doc, data, M_LEFT, y, 520);
+        y = bump(y, GAP.md);    // margen inferior después de la imagen
+
+   
 
 // === SECCIÓN: Gráfica de Costos Ocultos y ROI (usa la imagen enviada desde Velo) ===
 /*try {
