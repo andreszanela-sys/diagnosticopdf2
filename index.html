@@ -920,40 +920,6 @@ y = bump(y, GAP.lg);
     y += 8; // pequeño margen después del bloque
 
 
-    // Línea “Costo oculto estimado” (abajo de la tabla)
-    /*const totalLinea = (
-    lang==='en'
-        ? `Estimated hidden cost: ${data.costoTotalUSD} per year.`
-        : `Costo oculto estimado: ${data.costoTotalUSD} al año.`
-    );
-    doc.setFont('helvetica','bold'); doc.setFontSize(10);
-    y = drawParagraph(doc, totalLinea, M_LEFT, y, 520, 'helvetica', 'bold', 10, 12, 3);
-    y = bump(y, GAP.xs);
-
-
-
-    const recLinea = (
-    lang==='en'
-        ? `Recoverable (potential): ${fmtMoney(recTotalNum, lang)}.`
-        : `Recuperable (potencial): ${fmtMoney(recTotalNum, lang)}.`
-    );
-    doc.setFont('helvetica','bold'); doc.setFontSize(10);
-    y = drawParagraph(doc, recLinea, M_LEFT, y, 520, 'helvetica', 'bold', 10, 12, 8);
-    y = bump(y, GAP.sm);
-
-
-
-  // Footer de página
-  const pageH = doc.internal.pageSize.getHeight();  // obtiene la altura total del PDF
-    doc.setFontSize(8);
-    doc.setFont('helvetica','normal');
-    doc.text(
-    data.idioma==='en' ? 'Page 1' : 'Página 1',
-    520,           // posición X (derecha)
-    pageH - 32     // posición Y (32pt desde el borde inferior)
-    );*/
-
-
 
 
   // ============ PÁGINA 2: Retos / Fortalezas / Acciones clave ============
@@ -965,11 +931,11 @@ y = bump(y, GAP.lg);
 //if (doc.setWordSpace)  doc.setWordSpace(0);  // algunas builds lo exponen
 // (opcional) doc.setGState(new doc.GState({ charSpace: 0, wordSpace: 0 })); // si tu build lo permite
 
-const resumenLimpio = stripDanglingInitials(
-  normalizeText(
-    limpiarHTML(data.analisisNivel)
-  )
-);
+    const resumenLimpio = stripDanglingInitials(
+    normalizeText(
+        limpiarHTML(data.analisisNivel)
+    )
+    );
 
 
 
@@ -998,139 +964,42 @@ const resumenLimpio = stripDanglingInitials(
         y = drawCostChartIfAny(doc, data, M_LEFT, y, 520);
         y = bump(y, GAP.md);    // margen inferior después de la imagen
 
-   
+        y += 18;
 
-// === SECCIÓN: Gráfica de Costos Ocultos y ROI (usa la imagen enviada desde Velo) ===
-/*try {
-  const maxW = doc.internal.pageSize.getWidth() - (M_LEFT*2);
-  const maxH = 260;        // alto máximo sugerido
-  const raw   = data?.imagenes?.costos || null;         // puede venir con o sin dataURL
-  const hintedFmt = data?.imagenes?.costosFmt || null;  // "PNG" | "JPEG" (si llegó)
-  const w0 = Number(data?.imagenes?.costosW || 0);      // ancho real del canvas (si llegó)
-  const h0 = Number(data?.imagenes?.costosH || 0);      // alto real del canvas (si llegó)
+        // ——— Párrafo explicativo de la gráfica (si viene) ———
+    if (data.graficaCostosExplicacion) {
+    // Normaliza por si llega con saltos / espacios raros
+    const textoGraf = stripDanglingInitials(
+        normalizeText(String(data.graficaCostosExplicacion))
+    );
 
-  const { dataURL, fmt } = toDataURLAndFormat(raw, hintedFmt); // NORMALIZA
 
-  if (dataURL){
-    // Título
-    y = bump(y, GAP.md);
     doc.setFont('helvetica','bold'); doc.setFontSize(12);
     doc.text(
-      (data.idioma==='en' ? 'Hidden Costs & Potential ROI' : 'Costos ocultos y ROI potencial'),
-      M_LEFT, y
+        data.idioma === 'en'
+        ? 'Hidden costs and recovery potential by key area'
+        : 'Costo oculto y potencial de recuperación por área clave',
+        40, y
     );
-    y = bump(y, GAP.sm);
+    y += 18;
 
-    // Mantener relación de aspecto si tenemos medidas reales
-    let drawW = maxW, drawH = maxH;
-    if (w0 > 0 && h0 > 0){
-      const r = Math.min(maxW / w0, maxH / h0);
-      drawW = Math.max(50, Math.round(w0 * r));
-      drawH = Math.max(50, Math.round(h0 * r));
+    y = drawParagraph(
+        doc,
+        textoGraf,
+        40,          // margen izquierdo
+        y,
+        520,         // ancho de texto
+        'helvetica',
+        'normal',
+        10.5,        // tamaño
+        16,          // interlineado
+        12           // espacio después
+    );
     }
-
-    // Salto si no cabe
-    const pageH  = doc.internal.pageSize.getHeight();
-    const bottom = 60;
-    if (y + drawH + 16 > pageH - bottom){
-      doc.addPage();
-      if (doc.setTextColor) doc.setTextColor(0,0,0);
-      y = M_TOP;
-    }
-
-    // Centrar horizontalmente
-    const xImg = M_LEFT + Math.max(0, (maxW - drawW) / 2);
-
-    // ADD IMAGE (usa formato detectado o insinuado)
-    const jsPdfFmt = (fmt === 'PNG') ? 'PNG' : 'JPEG';
-    doc.addImage(dataURL, jsPdfFmt, xImg, y, drawW, drawH);
-
-    y += drawH + GAP.sm;
-
-    // Nota breve
-    doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
-    const nota = (data.idioma==='en')
-      ? 'Gray bars: current hidden cost by dimension. Green line: realistically recoverable portion if that dimension is prioritized in 12–18 months.'
-      : 'Barras grises: costo oculto actual por dimensión. Línea verde: porción recuperable si se prioriza esa dimensión en 12–18 meses.';
-    const lines = doc.splitTextToSize(nota, maxW);
-    doc.text(lines, M_LEFT, y);
-    y = bump(y, GAP.md);
-  }
-} catch(e){
-  // no detengas el PDF si falla la imagen
-  console.warn('No se pudo dibujar la gráfica de costos/ROI:', e);
-}*/
-
-
-
-
 
 
    
-   
-   
-   /* if (data.imagenes?.costos) {
-        const pageW = doc.internal.pageSize.getWidth();
-        const pageH = doc.internal.pageSize.getHeight();
-        const left  = 40, right = 40, top = 40, bottom = 60;
 
-        //const top   = 40;   // mismo margen superior que usas
-        //const bottom= 60;   // mismo margen inferior que usas
-        const maxW  = Math.min(520, pageW - left - right);
-        let imgW = maxW;
-        let imgH = Math.round(maxW * 9/16);
-
-        const srcW = Number(data.imagenes.costosW || 0);
-        const srcH = Number(data.imagenes.costosH || 0);
-        if (srcW > 0 && srcH > 0){
-            const ar = srcW / srcH;           // p.ej. 800/400 = 2.0
-            imgH = Math.round(imgW / ar);     // ← altura real para ese ancho
-        }
-
-        if (y + imgH > pageH - bottom) { doc.addPage(); y = top; }
-        doc.addImage(data.imagenes.costos, 'PNG', left, y, imgW, imgH);
-        y += imgH + 12;
-        }*/
-
-        // ⬇️ si no cabe, manda a la página siguiente
-        /*if (y + imgH > pageH - bottom) { 
-            doc.addPage(); 
-            y = top; 
-        }
-
-        doc.addImage(data.imagenes.costos, 'PNG', 40, y, maxW, imgH);
-        y += imgH + 12;
-        }*/
-
-       /* if (data.imagenes?.desconexion) {
-        const pageW = doc.internal.pageSize.getWidth();
-        const maxW  = Math.min(520, pageW - 2*40);
-        const imgH  = Math.round(maxW * 9/16);
-        const pageH = doc.internal.pageSize.getHeight();
-        // salto de página si no cabe
-        if (y + imgH > pageH - 60) { doc.addPage(); y = 40; }
-        doc.addImage(data.imagenes.desconexion, 'PNG', 40, y, maxW, imgH);
-        y += imgH + 12;
-        }*/
-
-
-  // El campo analisisNivel es la narrativa larga que tú armaste (parts.htmlFull),
-  // que incluye retos prioritarios, fortalezas, % de costo, recomendación.
-  // Lo vamos a volcar aquí como texto multilinea:
-  /*doc.setFont('helvetica','normal');
-  doc.setFontSize(9);
-  const analisisLines = splitLines(doc, limpiarHTML(data.analisisNivel), 520);
-  // Vamos dibujando línea por línea y saltando de página si se llena
-  for (let i=0; i<analisisLines.length; i++){
-    if (y > 760){
-      doc.addPage();
-      y = M_TOP;
-      doc.setFont('helvetica','normal');
-      doc.setFontSize(9);
-    }
-    doc.text(analisisLines[i], M_LEFT, y);
-    y+=12;
-  }*/
 
   // descarga
   const fileName = generarNombreArchivo(data);
