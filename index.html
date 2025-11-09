@@ -65,6 +65,7 @@ function drawResultsTable(doc, {lang, x, y, w}, rows){
   doc.setFont('helvetica','normal'); doc.setFontSize(9);
   rows.forEach(r=>{
     // líneas divisorias
+    if (!r || (!r.name && !r.avg && !r.costStr && !r.roiStr)) return;
     doc.setDrawColor(230); doc.line(x, y, x+w, y);
 
     let tx = x + 4, ty = y + 11;
@@ -214,7 +215,8 @@ function drawExecutiveSummary(doc, {x, y, w, lang, nivelGeneral, promedioGeneral
 
   // Encabezado
   doc.setFillColor(240,240,240);
-  doc.roundedRect(x, y, w, HROW, 6, 6, 'F');
+  if (doc.roundedRect) doc.roundedRect(x, y, w, HROW, 6, 6, 'F');
+  else doc.rect(x, y, w, HROW, 'F');
   doc.setFont('helvetica','bold'); doc.setFontSize(11);
   const HEADS = (lang==='en' ? ['Indicator','Value','Interpretation']
                               : ['Indicador','Valor','Interpretación']);
@@ -249,7 +251,8 @@ function drawExecutiveSummary(doc, {x, y, w, lang, nivelGeneral, promedioGeneral
   });
 
   // Marco
-  doc.setDrawColor(200); doc.roundedRect(x, y0, w, y - y0, 6, 6);
+  if (doc.roundedRect) doc.roundedRect(x, y0, w, y - y0, 6, 6);
+  else doc.rect(x, y0, w, y - y0);
   return y + GAP.lg;
 }
 
@@ -618,8 +621,9 @@ window.addEventListener('message', async (event) => {
   // sólo reaccionar a data válidos del diagnóstico
   if (data.type === 'datosInforme') {
   try {
-    await generarPDFyDescargar(data);
-    window.parent.postMessage({ type:'pdf-ok' }, '*');
+    await generarPDFyDescargar(data); // genera y dentro ya envía pdf-ok o pdf-url
+    
+    //window.parent.postMessage({ type:'pdf-ok' }, '*');
   } catch(err) {
     console.error('[PDF] Error generando PDF:', err);
     window.parent.postMessage({ type:'pdf-error', message: String(err && err.message || err) }, '*');
@@ -1158,6 +1162,8 @@ function limpiarHTML(htmlString){
     .replace(/<\/?(strong|em|b|i|u|span)\b[^>]*>/gi, '')
     // Elimina el resto de etiquetas
     .replace(/<[^>]+>/g, '')
+
+    .replace(/[\u2000-\u200D\u2060\ufeff]/g, '')
     // Sustitutos seguros
     .replace(/&nbsp;/gi, ' ')
     .replace(/[ \t]{2,}/g, ' ')
@@ -1224,7 +1230,8 @@ function drawCostChartIfAny(doc, data, x, y, maxWidthPT) {
     y += 20;
 
     // Imagen (usa el fmt REAL)
-    doc.addImage(dataURL, finalFmt, x, y, drawW, drawH);
+    //doc.addImage(dataURL, finalFmt, x, y, drawW, drawH);
+    doc.addImage(dataURL, (finalFmt === 'PNG' ? 'PNG' : 'JPEG'), x, y, drawW, drawH);
     //doc.addImage(dataURL, fmt || 'JPEG', x, y, drawW, drawH);
     y += drawH + 10;
 
