@@ -19,6 +19,45 @@
 const LHF = 1.35;                       // line-height factor global
 const P_SP = 8;                         // espacio entre párrafos (pt)
 
+// Carga una imagen (URL http/https o dataURL) y la devuelve como {dataURL, w, h}
+function loadImg(url){
+  return new Promise((resolve, reject)=>{
+    if (!url) return resolve(null);
+
+    const img = new Image();
+    // permite CORS si tu logo viene de otro dominio con headers adecuados
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      // Si ya es dataURL no hace falta canvas, pero esto lo unifica
+      const canvas = document.createElement('canvas');
+      canvas.width  = img.naturalWidth || img.width;
+      canvas.height = img.naturalHeight || img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      resolve({ dataURL: canvas.toDataURL('image/png'), w: canvas.width, h: canvas.height });
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+// Dibuja el logo en la esquina superior derecha. Devuelve la altura dibujada.
+async function drawLogoTopRight(doc, url, { top=40, right=40, maxW=120 } = {}){
+  const im = await loadImg(url);
+  if (!im) return 0;
+
+  const pageW = doc.internal.pageSize.getWidth();
+  const targetW = Math.min(maxW, im.w || maxW);
+  const targetH = im.w && im.h ? Math.round(targetW * (im.h / im.w)) : Math.round(targetW * 0.4);
+  const x = pageW - right - targetW;
+  const y = top;
+
+  // usa PNG (seguro) — jsPDF detecta a partir del dataURL
+  doc.addImage(im.dataURL, 'PNG', x, y, targetW, targetH);
+  return targetH;
+}
+
+
 
 function drawLabelValue(doc, label, value, x, y, wLabel=110, size=9) {
   doc.setFont("helvetica", "bold");  doc.setFontSize(size);
@@ -664,10 +703,19 @@ async function generarPDFyDescargar(data){
   // ============ PORTADA / PÁGINA 1 ============
 
   // Branding arriba derecha
-  doc.setFont('helvetica','normal');
+  /*doc.setFont('helvetica','normal');
   doc.setFontSize(8);
   doc.text('Innovación Regenerativa | Informe diagnóstico', 400, y);
-  y = bump(y, GAP.lg);       
+  y = bump(y, GAP.lg); */  
+  
+
+
+  // Logo arriba derecha (usa data.logoUrl)
+await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP - 6, right: 40, maxW: 120 });
+// no movemos "y" porque el contenido va por la izquierda
+
+
+
 
   // Título
   doc.setFontSize(16);
@@ -924,6 +972,7 @@ y = bump(y, GAP.lg);
 
   // ============ PÁGINA 2: Retos / Fortalezas / Acciones clave ============
   doc.addPage();
+  await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP - 6, right: 40, maxW: 120 });
   y = M_TOP;
 
   // 🔒 Forzar espaciados a 0
@@ -959,6 +1008,7 @@ y = bump(y, GAP.lg);
 
    // === NUEVA PÁGINA 3: Gráfica de Costos & ROI ===
         doc.addPage();
+        await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP - 6, right: 40, maxW: 120 });
         if (doc.setTextColor) doc.setTextColor(0,0,0);
         y = 40;                 // mismo M_TOP que usas arriba (M_TOP = 40)
         y = drawCostChartIfAny(doc, data, M_LEFT, y, 520);
