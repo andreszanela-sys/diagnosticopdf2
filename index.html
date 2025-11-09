@@ -98,7 +98,7 @@ function drawResultsTable(doc, {lang, x, y, w}, rows){
 }
 
 // --- Espaciados estándar (pt)
-const GAP = { xs: 6, sm: 12, md: 18, lg: 28, xl: 40 };
+const GAP = { xs: 6, sm: 12, md: 18, lg: 25, xl: 38 };
 function bump(y, a = GAP.md){ return y + a; }
 
 
@@ -991,13 +991,6 @@ const resumenLimpio = stripDanglingInitials(
         doc.addPage();
         if (doc.setTextColor) doc.setTextColor(0,0,0);
         y = 40;                 // mismo M_TOP que usas arriba (M_TOP = 40)
-        doc.setFont('helvetica','bold'); 
-        doc.setFontSize(12);
-        doc.text(
-        data.idioma === 'en' ? 'Hidden Costs & Recoverable ROI' : 'Costos ocultos & ROI recuperable',
-        M_LEFT, y
-        );
-        y = bump(y, GAP.sm);
         y = drawCostChartIfAny(doc, data, M_LEFT, y, 520);
         y = bump(y, GAP.md);    // margen inferior después de la imagen
 
