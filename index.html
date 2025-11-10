@@ -42,7 +42,7 @@ function loadImg(url){
 }
 
 // Dibuja el logo en la esquina superior derecha. Devuelve la altura dibujada.
-async function drawLogoTopRight(doc, url, { top=40, right=40, maxW=60, maxH=60 } = {}){
+async function drawLogoTopRight(doc, url, { top=40, right=40, maxW=65, maxH=65 } = {}){
   const im = await loadImg(url);
   if (!im) return 0;
 
@@ -718,7 +718,7 @@ async function generarPDFyDescargar(data){
 
 
   // Logo arriba derecha (usa data.logoUrl)
-await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP - 6, right: 40, maxW: 55, maxH:55 });
+await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP - 6, right: 40, maxW: 60, maxH:60 });
 // no movemos "y" porque el contenido va por la izquierda
 
 
@@ -979,9 +979,9 @@ y = bump(y, GAP.lg);
 
   // ============ PÁGINA 2: Retos / Fortalezas / Acciones clave ============
   doc.addPage();
-  await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP - 6, right: 40, maxW: 55, maxH:55 });
+  await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP - 6, right: 40, maxW: 60, maxH:60 });
   y = M_TOP;
-  y += 25;
+  y += 40;
 
  
 
@@ -1018,7 +1018,7 @@ y = bump(y, GAP.lg);
 
    // === NUEVA PÁGINA 3: Gráfica de Costos & ROI ===
         doc.addPage();
-        await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP - 6, right: 40, maxW: 55, maxH:55 });
+        await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP - 6, right: 40, maxW: 60, maxH:60 });
 
        
 
@@ -1027,7 +1027,7 @@ y = bump(y, GAP.lg);
         y = drawCostChartIfAny(doc, data, M_LEFT, y, 520);
         y = bump(y, GAP.md);    // margen inferior después de la imagen
 
-        y += 18;
+        y += 33;
 
         // ——— Párrafo explicativo de la gráfica (si viene) ———
     if (data.graficaCostosExplicacion) {
