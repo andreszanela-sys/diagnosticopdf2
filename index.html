@@ -1020,7 +1020,7 @@ y = bump(y, GAP.lg);
         doc.addPage();
         await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP - 6, right: 40, maxW: 60, maxH:60 });
 
-       
+       y += 38;
 
         if (doc.setTextColor) doc.setTextColor(0,0,0);
         y = 40;                 // mismo M_TOP que usas arriba (M_TOP = 40)
@@ -1044,7 +1044,7 @@ y = bump(y, GAP.lg);
         : 'Costo oculto y potencial de recuperación por área clave',
         40, y
     );
-    y += 28;
+    y += 18;
 
     y = drawParagraph(
         doc,
