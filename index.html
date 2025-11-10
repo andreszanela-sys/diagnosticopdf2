@@ -1070,6 +1070,38 @@ y = bump(y, GAP.lg);
     if (doc.setTextColor) doc.setTextColor(0,0,0);
     y = drawAreasChartIfAny(doc, data, M_LEFT, y, 520);
     y = bump(y, GAP.md);
+
+    // ——— Texto explicativo de la desconexión (mismo que en la web) ———
+    {
+      const textoDesc = (data.introDesconexion || data.insightNivel || '').trim();
+      if (textoDesc) {
+        const limpio = stripDanglingInitials(normalizeText(textoDesc));
+
+        doc.setFont('helvetica','bold'); 
+        doc.setFontSize(12);
+        doc.text(
+          data.idioma === 'en' 
+            ? 'Human tension in critical organization areas' 
+            : 'Lectura de la tensión humana y áreas críticas',
+          M_LEFT, y
+        );
+        y += 18;
+
+        y = drawParagraph(
+          doc,
+          limpio,
+          M_LEFT,           // margen izquierdo
+          y,
+          520,              // ancho de texto
+          'helvetica',
+          'normal',
+          10.5,             // tamaño
+          16,               // interlineado
+          GAP.md            // espacio después
+        );
+      }
+    }
+
       
 
 
