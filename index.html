@@ -42,19 +42,26 @@ function loadImg(url){
 }
 
 // Dibuja el logo en la esquina superior derecha. Devuelve la altura dibujada.
-async function drawLogoTopRight(doc, url, { top=40, right=40, maxW=120 } = {}){
+async function drawLogoTopRight(doc, url, { top=40, right=40, maxW=36, maxH=40 } = {}){
   const im = await loadImg(url);
   if (!im) return 0;
 
   const pageW = doc.internal.pageSize.getWidth();
-  const targetW = Math.min(maxW, im.w || maxW);
-  const targetH = im.w && im.h ? Math.round(targetW * (im.h / im.w)) : Math.round(targetW * 0.4);
-  const x = pageW - right - targetW;
+
+  const sW = maxW / (im.w || maxW);
+  const sH = maxH / (im.h || maxH);
+  const scale = Math.min(sW, sH, 1);               // respeta ambos límites
+  const w = Math.round((im.w || maxW) * scale);
+  const h = Math.round((im.h || maxW*0.4) * scale);
+
+  /*const targetW = Math.min(maxW, im.w || maxW);
+  const targetH = im.w && im.h ? Math.round(targetW * (im.h / im.w)) : Math.round(targetW * 0.4);*/
+  const x = pageW - right - w;
   const y = top;
 
   // usa PNG (seguro) — jsPDF detecta a partir del dataURL
-  doc.addImage(im.dataURL, 'PNG', x, y, targetW, targetH);
-  return targetH;
+  doc.addImage(im.dataURL, 'PNG', x, y, w, h);
+  return h;
 }
 
 
@@ -711,7 +718,7 @@ async function generarPDFyDescargar(data){
 
 
   // Logo arriba derecha (usa data.logoUrl)
-await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP - 6, right: 40, maxW: 60 });
+await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP - 6, right: 40, maxW: 40, maxH:40 });
 // no movemos "y" porque el contenido va por la izquierda
 
 y = bump(y, GAP.lg); 
@@ -972,7 +979,7 @@ y = bump(y, GAP.lg);
 
   // ============ PÁGINA 2: Retos / Fortalezas / Acciones clave ============
   doc.addPage();
-  await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP - 6, right: 40, maxW: 60 });
+  await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP - 6, right: 40, maxW: 40, maxH:40 });
   y = M_TOP;
   y = bump(y, GAP.lg);
 
@@ -1009,9 +1016,9 @@ y = bump(y, GAP.lg);
 
    // === NUEVA PÁGINA 3: Gráfica de Costos & ROI ===
         doc.addPage();
-        await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP - 6, right: 40, maxW: 60 });
+        await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP - 6, right: 40, maxW: 40, maxH:40 });
         y = bump(y, GAP.lg);
-        
+
         if (doc.setTextColor) doc.setTextColor(0,0,0);
         y = 40;                 // mismo M_TOP que usas arriba (M_TOP = 40)
         y = drawCostChartIfAny(doc, data, M_LEFT, y, 520);
