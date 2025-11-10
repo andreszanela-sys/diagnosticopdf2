@@ -721,7 +721,7 @@ async function generarPDFyDescargar(data){
 await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP - 6, right: 40, maxW: 40, maxH:40 });
 // no movemos "y" porque el contenido va por la izquierda
 
-y = bump(y, GAP.lg); 
+
 
 
   // Título
@@ -981,7 +981,7 @@ y = bump(y, GAP.lg);
   doc.addPage();
   await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP - 6, right: 40, maxW: 40, maxH:40 });
   y = M_TOP;
-  y = bump(y, GAP.lg);
+ 
 
   // 🔒 Forzar espaciados a 0
 //if (doc.setCharSpace)  doc.setCharSpace(0);
@@ -1017,7 +1017,7 @@ y = bump(y, GAP.lg);
    // === NUEVA PÁGINA 3: Gráfica de Costos & ROI ===
         doc.addPage();
         await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP - 6, right: 40, maxW: 40, maxH:40 });
-        y = bump(y, GAP.lg);
+       
 
         if (doc.setTextColor) doc.setTextColor(0,0,0);
         y = 40;                 // mismo M_TOP que usas arriba (M_TOP = 40)
