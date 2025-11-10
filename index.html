@@ -1018,10 +1018,12 @@ y = bump(y, GAP.lg);
 
    // === NUEVA PÁGINA 3: Gráfica de Costos & ROI ===
         doc.addPage();
-        await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP - 6, right: 40, maxW: 60, maxH:60 });
+        const logoH3 = await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP - 6, right: 40, maxW: 60, maxH: 60 });
 
-        y = M_TOP;
-        y +=  + 12;        // padding debajo del logo (12pt)
+        // Punto de arranque para el título de la gráfica: top + alto del logo + margen
+        y = M_TOP + (logoH3 || 0) + GAP.md;   // p.ej. GAP.md = 18pt
+
+       
 
         if (doc.setTextColor) doc.setTextColor(0,0,0);
         y = 40;                 // mismo M_TOP que usas arriba (M_TOP = 40)
@@ -1060,8 +1062,15 @@ y = bump(y, GAP.lg);
     );
     }
 
+    // === NUEVA PÁGINA 4: Gráfica de Tensión por Área ===
+    doc.addPage();
+    const logoH4 = await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP - 6, right: 40, maxW: 60, maxH: 60 });
 
-   
+    y = M_TOP + (logoH4 || 0) + GAP.md;
+    if (doc.setTextColor) doc.setTextColor(0,0,0);
+    y = drawAreasChartIfAny(doc, data, M_LEFT, y, 520);
+    y = bump(y, GAP.md);
+      
 
 
   // descarga
@@ -1178,6 +1187,69 @@ function drawCostChartIfAny(doc, data, x, y, maxWidthPT) {
     return y;
   }
 }
+
+function drawAreasChartIfAny(doc, data, x, y, maxWidthPT) {
+  try {
+    const raw     = data?.imagenes?.desconexion || '';
+    const hinted  = data?.imagenes?.desconexionFmt || null;
+    const srcW    = Number(data?.imagenes?.desconexionW || 0) || 1644;
+    const srcH    = Number(data?.imagenes?.desconexionH || 0) || 1024;
+
+    const { dataURL, fmt } = toDataURLAndFormat(raw, hinted);
+    let finalFmt = fmt;
+    if (!finalFmt) {
+      const s = (raw||'').trim().replace(/\s+/g,'');
+      finalFmt = s.startsWith('iVBOR') ? 'PNG' : (s.startsWith('/9j/') ? 'JPEG' : 'JPEG');
+    }
+    if (!dataURL) return y;
+
+    const pageW  = doc.internal.pageSize.getWidth();
+    const pageH  = doc.internal.pageSize.getHeight();
+    const bottom = 60;
+
+    const drawW  = Math.min(maxWidthPT, pageW - x - 40);
+    const aspect = (srcW > 0 && srcH > 0) ? (srcH/srcW) : (9/16);
+    const drawH  = Math.round(drawW * aspect);
+
+    // Título y nota
+    const titulo = (data?.idioma === 'en')
+      ? 'Human tension by area'
+      : 'Tensión humana por área';
+
+    const note   = (data?.idioma === 'en')
+      ? 'Bars: unmet capacity (0–4). Higher bar = more human tension.'
+      : 'Barras: capacidad no instalada (0–4). Barra más alta = mayor tensión humana.';
+
+    doc.setFont('helvetica','bold'); doc.setFontSize(13);
+    const noteLines = doc.splitTextToSize(note, drawW);
+    const needH = 20 + drawH + (noteLines.length*12 + 6) + 6;
+
+    if (y + needH > pageH - bottom){
+      doc.addPage();
+      if (doc.setTextColor) doc.setTextColor(0,0,0);
+      y = 40;
+    }
+
+    // Título
+    doc.text(titulo, x, y);
+    y += 20;
+
+    // Imagen
+    doc.addImage(dataURL, (finalFmt === 'PNG' ? 'PNG' : 'JPEG'), x, y, drawW, drawH);
+    y += drawH + 10;
+
+    // Nota
+    doc.setFont('helvetica','normal'); doc.setFontSize(10);
+    doc.text(noteLines, x, y);
+    y += (noteLines.length*12 + 6);
+
+    return y;
+  } catch (e) {
+    console.warn('[PDF] Error al dibujar gráfica de áreas:', e);
+    return y;
+  }
+}
+
 
 
 
