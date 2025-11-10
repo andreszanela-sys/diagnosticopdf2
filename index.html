@@ -1073,7 +1073,10 @@ y = bump(y, GAP.lg);
 
     // ——— Texto explicativo de la desconexión (mismo que en la web) ———
     {
-      const textoDesc = (data.introDesconexion || data.insightNivel || '').trim();
+      const textoDesc =  (data.graficaDesconexionExplicacion && String(data.graficaDesconexionExplicacion)) ||
+    (data.introDesconexion && String(data.introDesconexion)) ||
+    (data.insightNivel && String(data.insightNivel)) ||
+    '';
       if (textoDesc) {
         const limpio = stripDanglingInitials(normalizeText(textoDesc));
 
@@ -1081,8 +1084,8 @@ y = bump(y, GAP.lg);
         doc.setFontSize(12);
         doc.text(
           data.idioma === 'en' 
-            ? 'Human tension in critical organization areas' 
-            : 'Lectura de la tensión humana y áreas críticas',
+            ? 'Human tension and critical organization areas' 
+            : 'Tensión humana y áreas críticas',
           M_LEFT, y
         );
         y += 18;
