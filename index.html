@@ -833,7 +833,7 @@ y = bump(y, GAP.lg);
     doc.setFont('helvetica','normal');
     doc.setFontSize(10); // antes era 9
     const insight = data.insightNivel || '';
-    const insightLines = splitLines(doc, insight, 520);
+    //const insightLines = splitLines(doc, insight, 520);
     y = drawParagraph(doc, insight, M_LEFT, y, 520, 'helvetica', 'normal', 11, 16, GAP.sm);
 
 
@@ -853,6 +853,110 @@ y = bump(y, GAP.lg);
     const rate  = recRateFromScore(avg);
     recuperableTotalN += Math.round(costN * rate);
     });*/
+
+
+// ========= Helpers LOCALES para el análisis dimensional (reutiliza NOMBRES_ES/EN) =========
+function _wrap(doc, txt, maxW){
+  return doc.splitTextToSize(String(txt ?? ''), maxW);
+}
+function _ensureSpace(doc, y, needH, top=40, bottom=60){
+  const pageH = doc.internal.pageSize.getHeight();
+  if (y + needH > pageH - bottom){
+    doc.addPage();
+    if (doc.setTextColor) doc.setTextColor(0,0,0);
+    return top;
+  }
+  return y;
+}
+
+
+
+function _drawAreaDimBoxClosed(doc, {x, y, w, item, lang}) {
+  const ROT = (lang==='en'
+    ? { nivel:'Level:', urgencia:'Urgency:', consecuencia:'Consequence:', recomendacion:'Recommendation:' }
+    : { nivel:'Nivel:', urgencia:'Urgencia:', consecuencia:'Consecuencia:', recomendacion:'Recomendación:' }
+  );
+  const visible = (lang==='en' ? NOMBRES_EN[item.areaKey] : NOMBRES_ES[item.areaKey]) || item.areaKey;
+
+  const y0 = y;
+  doc.setFillColor(234,244,241);
+  if (doc.roundedRect) doc.roundedRect(x, y, w, 12, 2, 2, 'F'); else doc.rect(x, y, w, 12, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(0);
+  doc.text(String(visible).toUpperCase(), x+6, y+8);
+  y += 16;
+
+  const colX = x + 6;
+  const colW = w - 12;
+
+  // Nivel
+  doc.setFont('helvetica','bold'); doc.setFontSize(9);
+  doc.text(`${ROT.nivel} ${String(item.nivelLabel||'')} (${String(item.promedio||'0.0')}/5)`, colX, y);
+  y += 12;
+
+  // Urgencia
+  doc.text(ROT.urgencia, colX, y);
+  y += 10; doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
+  _wrap(doc, item.urgencia || '', colW).forEach(line => { doc.text(line, colX, y); y += 12; });
+
+  // Consecuencia
+  y += 4; doc.setFont('helvetica','bold'); doc.setFontSize(9);
+  doc.text(ROT.consecuencia, colX, y);
+  y += 10; doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
+  _wrap(doc, item.consecuencia || '', colW).forEach(line => { doc.text(line, colX, y); y += 12; });
+
+  // Recomendación
+  y += 4; doc.setFont('helvetica','bold'); doc.setFontSize(9);
+  doc.text(ROT.recomendacion, colX, y);
+  y += 10; doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
+  _wrap(doc, item.recomendacion || '', colW).forEach(line => { doc.text(line, colX, y); y += 12; });
+
+  // Marco
+  doc.setDrawColor(210); doc.setLineWidth(0.4);
+  if (doc.roundedRect) doc.roundedRect(x, y0, w, (y - y0) + 4, 2, 2);
+  else doc.rect(x, y0, w, (y - y0) + 4);
+
+  return y + 10; // siguiente y
+}
+
+function _renderAnalisisDimensional(doc, data, startY, left=40, totalW=520){
+  const lang = (data.idioma==='en'?'en':'es');
+  const titulo = (lang==='en' ? 'Dimensional analysis by area' : 'Análisis dimensional por área');
+
+  let y = _ensureSpace(doc, startY, 28); // por el título
+  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(0);
+  doc.text(titulo, left, y);
+  y += 18;
+
+  const colW = 250; // 2 columnas (250 + 20 de gutter + 250 = 520 aprox)
+  const gutter = 20;
+  const rightX = left + colW + gutter;
+
+  const items = Array.isArray(data.areasDetalle) ? data.areasDetalle : [];
+  let maxRowY = y;
+
+  items.forEach((item, idx) => {
+    const isLeft = (idx % 2 === 0);
+    const x = isLeft ? left : rightX;
+
+    // Altura estimada mínima por caja para decidir salto (aprox 140–220)
+    y = _ensureSpace(doc, y, 180);
+
+    const nextY = _drawAreaDimBoxClosed(doc, {x, y, w: colW, item, lang});
+    if (isLeft) {
+      // dejamos y tal cual; comparamos al cerrar la fila
+      maxRowY = Math.max(maxRowY, nextY);
+    } else {
+      // cerramos la fila y bajamos
+      y = Math.max(maxRowY, nextY);
+      maxRowY = y;
+    }
+  });
+
+  // Si quedó una última caja en izquierda sin par, empuja y para no encimar lo siguiente
+  if (items.length % 2 === 1) y = maxRowY + 6;
+
+  return y + 6;
+}
 
 // ===== Resumen ejecutivo con interpretación (antes de "Nivel general organizacional") =====
 
@@ -1105,6 +1209,13 @@ y = bump(y, GAP.lg);
       }
     }
 
+
+    // ============ PÁGINA 5: Análisis dimensional por área ============
+    doc.addPage();
+    await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP - 6, right: 40, maxW: 60, maxH: 60 });
+    let yDim = M_TOP;
+    yDim = _renderAnalisisDimensional(doc, data, yDim, M_LEFT, 520);
+
       
 
 
@@ -1284,6 +1395,7 @@ function drawAreasChartIfAny(doc, data, x, y, maxWidthPT) {
     return y;
   }
 }
+
 
 
 
