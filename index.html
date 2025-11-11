@@ -884,7 +884,7 @@ function _drawAreaDimBoxClosed(doc, {x, y, w, item, lang}) {
   if (doc.roundedRect) doc.roundedRect(x, y, w, 12, 2, 2, 'F'); else doc.rect(x, y, w, 12, 'F');
   doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(0);
   doc.text(String(visible).toUpperCase(), x+6, y+8);
-  y += 18;
+  y += 22;
 
   const colX = x + 6;
   const colW = w - 12;
@@ -892,7 +892,7 @@ function _drawAreaDimBoxClosed(doc, {x, y, w, item, lang}) {
   // Nivel
   doc.setFont('helvetica','bold'); doc.setFontSize(9);
   doc.text(`${ROT.nivel} ${String(item.nivelLabel||'')} (${String(item.promedio||'0.0')}/5)`, colX, y);
-  y += 14;
+  y += 17;
 
   // Urgencia
   doc.text(ROT.urgencia, colX, y);
@@ -1213,15 +1213,14 @@ function _renderAnalisisDimensional(doc, data, startY, left=40, totalW=520){
 
     // ============ PÁGINA 5: Análisis dimensional por área ============
     doc.addPage();
-    const logoH5 = await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP - 6, right: 40, maxW: 60, maxH: 60 });
 
-        // Punto de arranque para el título de la gráfica: top + alto del logo + margen
-        y = M_TOP + (logoH5 || 0) + GAP.md;   // p.ej. GAP.md = 18pt
+    const logoH5 = await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP, right: 40, maxW: 60, maxH: 60 });
+      y = M_TOP + (logoH5 || 0) + GAP.md;
+      let yDim = y; // ← arranca debajo del logo
+      yDim = _renderAnalisisDimensional(doc, data, yDim, M_LEFT, 520);
     
-        let yDim = M_TOP;
     
-        yDim = _renderAnalisisDimensional(doc, data, yDim, M_LEFT, 520);
-
+       
       
 
 
