@@ -707,6 +707,8 @@ async function generarPDFyDescargar(data){
   const M_LEFT = 40;
   const M_TOP  = 40;
   let y = M_TOP;
+  // justo después de crear doc
+  const logoPre = await loadImg(data.logoUrl);
 
   // ============ PORTADA / PÁGINA 1 ============
 
@@ -860,12 +862,28 @@ y = bump(y, GAP.lg);
 function _wrap(doc, txt, maxW){
   return doc.splitTextToSize(String(txt ?? ''), maxW);
 }
-function _ensureSpace(doc, y, needH, top=40, bottom=60){
+
+function _ensureSpace(doc, y, needH, top=40, bottom=60, logo=null){
   const pageH = doc.internal.pageSize.getHeight();
   if (y + needH > pageH - bottom){
     doc.addPage();
     if (doc.setTextColor) doc.setTextColor(0,0,0);
-    return top;
+
+    // Si tenemos logo precargado, lo dibujamos arriba derecha
+    if (logo && logo.dataURL){
+      const pageW = doc.internal.pageSize.getWidth();
+      const maxW = 60, maxH = 60, right = 40;
+      const sW = maxW / (logo.w || maxW);
+      const sH = maxH / (logo.h || maxH);
+      const scale = Math.min(sW, sH, 1);
+      const w = Math.round((logo.w || maxW) * scale);
+      const h = Math.round((logo.h || maxW * 0.4) * scale);
+      const x = pageW - right - w;
+      const yTop = top - 6;
+      doc.addImage(logo.dataURL, 'PNG', x, yTop, w, h);
+      return top + h + GAP.md;      // comenzamos debajo del logo
+    }
+    return top;                      // fallback sin logo
   }
   return y;
 }
@@ -931,11 +949,11 @@ function _drawAreaDimBoxClosed(doc, {x, y, w, item, lang}) {
   return y + 12; // siguiente y
 }
 
-function _renderAnalisisDimensional(doc, data, startY, left=40, totalW=520){
+function _renderAnalisisDimensional(doc, data, startY, left=40, totalW=520, logoPre=null){
   const lang = (data.idioma==='en'?'en':'es');
   const titulo = (lang==='en' ? 'Dimensional analysis by area' : 'Análisis dimensional por área');
 
-  let y = _ensureSpace(doc, startY, 28); // por el título
+  let y = _ensureSpace(doc, startY, 28, /*top*/40, /*bottom*/60, logoPre); // por el título
   doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(0);
   doc.text(titulo, left, y);
   y += 18;
@@ -952,7 +970,7 @@ function _renderAnalisisDimensional(doc, data, startY, left=40, totalW=520){
     const x = isLeft ? left : rightX;
 
     // Altura estimada mínima por caja para decidir salto (aprox 140–220)
-    y = _ensureSpace(doc, y, 180);
+    y = _ensureSpace(doc, y, 180, 40, 60, logoPre);
 
     const nextY = _drawAreaDimBoxClosed(doc, {x, y, w: colW, item, lang});
     if (isLeft) {
@@ -1229,15 +1247,18 @@ function _renderAnalisisDimensional(doc, data, startY, left=40, totalW=520){
     const logoH5 = await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP, right: 40, maxW: 60, maxH: 60 });
       y = M_TOP + (logoH5 || 0) + GAP.md;
       let yDim = y; // ← arranca debajo del logo
-      yDim = _renderAnalisisDimensional(doc, data, yDim, M_LEFT, 520);
+      yDim = _renderAnalisisDimensional(doc, data, yDim, M_LEFT, 520, logoPre);
     
     
-       // ——— CTA final en una página nueva, debajo del logo ———
-      doc.addPage();
-      const logoH6 = await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP, right: 40, maxW: 60, maxH: 60 });
-      let yCTA = M_TOP + (logoH6 || 0) + GAP.md;
-      drawCTASection(doc, { x: M_LEFT - 4, y: yCTA, w: 520, lang: (data.idioma === 'en' ? 'en' : 'es') });
-            
+      // CTA inmediatamente después del análisis dimensional.
+      // Si no cabe, la propia función moverá a nueva página y pondrá el logo.
+      drawCTASection(doc, {
+        x: M_LEFT - 4,
+        y: yDim,
+        w: 520,
+        lang: (data.idioma === 'en' ? 'en' : 'es'),
+        logo: logoPre
+      });
 
 
   // descarga
@@ -1418,15 +1439,29 @@ function drawAreasChartIfAny(doc, data, x, y, maxWidthPT) {
 }
 
 // === CTA final: contacto y próximos pasos (con links clicables) ===
-function drawCTASection(doc, { x=40, y=40, w=520, lang='es' } = {}) {
+function drawCTASection(doc, { x=40, y=40, w=520, lang='es', logo=null } = {}) {
   const pageH = doc.internal.pageSize.getHeight();
   const bottom = 60;
+  const needH = 150;
 
-  // si no cabe, crear página nueva
-  const needH = 150; // alto estimado
   if (y + needH > pageH - bottom) {
     doc.addPage();
-    y = 40;
+
+    // dibuja logo si está disponible
+    if (logo && logo.dataURL){
+      const pageW = doc.internal.pageSize.getWidth();
+      const maxW=60, maxH=60, right=40, top=40;
+      const sW = maxW / (logo.w || maxW);
+      const sH = maxH / (logo.h || maxH);
+      const scale = Math.min(sW, sH, 1);
+      const wL = Math.round((logo.w || maxW) * scale);
+      const hL = Math.round((logo.h || maxW*0.4) * scale);
+      const xL = pageW - right - wL;
+      doc.addImage(logo.dataURL, 'PNG', xL, top - 6, wL, hL);
+      y = top + hL + GAP.md;   // continuar debajo del logo
+    } else {
+      y = 40;
+    }
   }
 
   // caja
