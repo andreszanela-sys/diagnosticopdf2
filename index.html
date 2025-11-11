@@ -159,17 +159,17 @@ const CONFIG_ROI = {
 
 // === Traducción de puntaje → etiqueta de nivel (igual que en Velo) ===
 function nivelConexionTexto(p, l) {
-  if (p <= 2.0) return l==='en' ? 'In crisis'     : 'En crisis';
-  if (p <= 3.0) return l==='en' ? 'Disconnected'  : 'Desconectado';
-  if (p <= 4.0) return l==='en' ? 'In transition' : 'En transición';
+  if (p <= 2.3) return l==='en' ? 'In crisis'     : 'En crisis';
+  if (p <= 3.2) return l==='en' ? 'Disconnected'  : 'Desconectado';
+  if (p <= 4.1) return l==='en' ? 'In transition' : 'En transición';
   return               l==='en' ? 'Regenerative'  : 'Regenerativa';
 }
 
 // === Ratio recuperable desde score (misma lógica que recRateFromScore de Velo) ===
 function recRateFromScore(score){
-  if (score <= 2.0) return CONFIG_ROI.recRates.crisis;
-  if (score <= 3.0) return CONFIG_ROI.recRates.desconectado;
-  if (score <= 4.0) return CONFIG_ROI.recRates.transicion;
+  if (score <= 2.3) return CONFIG_ROI.recRates.crisis;
+  if (score <= 3.2) return CONFIG_ROI.recRates.desconectado;
+  if (score <= 4.1) return CONFIG_ROI.recRates.transicion;
   return              CONFIG_ROI.recRates.regenerativa;
 }
 
