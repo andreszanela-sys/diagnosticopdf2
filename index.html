@@ -91,7 +91,7 @@ function drawResultsTable(doc, {lang, x, y, w}, rows){
   const y0   = y;
 
   // Encabezado
-  doc.setFillColor(240,240,240);
+  doc.setFillColor(234, 246, 241);
   doc.rect(x, y, w, HROW, 'F');
   doc.setFont('helvetica','bold'); doc.setFontSize(10);
 
@@ -260,7 +260,7 @@ function drawExecutiveSummary(doc, {x, y, w, lang, nivelGeneral, promedioGeneral
   const y0 = y;
 
   // Encabezado
-  doc.setFillColor(240,240,240);
+  doc.setFillColor(234, 246, 241);
   if (doc.roundedRect) doc.roundedRect(x, y, w, HROW, 6, 6, 'F');
   else doc.rect(x, y, w, HROW, 'F');
   doc.setFont('helvetica','bold'); doc.setFontSize(11);
