@@ -881,10 +881,21 @@ function _drawAreaDimBoxClosed(doc, {x, y, w, item, lang}) {
 
   const y0 = y;
   doc.setFillColor(234,244,241);
-  if (doc.roundedRect) doc.roundedRect(x, y, w, 12, 2, 2, 'F'); else doc.rect(x, y, w, 12, 'F');
+    // — Franja superior más alta (mejor legibilidad)
+    const headerH = 20;  // <— puedes subir a 22 si lo quieres aún más grueso
+    if (doc.roundedRect) doc.roundedRect(x, y, w, headerH, 2, 2, 'F');
+    else doc.rect(x, y, w, headerH, 'F');
+
+    doc.setFont('helvetica','bold'); 
+    doc.setFontSize(10.5);  // un pelín más grande
+    doc.setTextColor(0);
+    doc.text(String(visible).toUpperCase(), x + 6, y + headerH - 6); // centrado vertical
+    y += headerH + 4; // deja aire antes de “Nivel”
+
+  /*if (doc.roundedRect) doc.roundedRect(x, y, w, 12, 2, 2, 'F'); else doc.rect(x, y, w, 12, 'F');
   doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(0);
   doc.text(String(visible).toUpperCase(), x+6, y+8);
-  y += 22;
+  y += 22;*/
 
   const colX = x + 6;
   const colW = w - 12;
