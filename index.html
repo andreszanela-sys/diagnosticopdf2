@@ -687,6 +687,7 @@ async function generarPDFyDescargar(data){
     unit: 'pt',   // puntos
     format: 'letter' // o 'a4', según tu pdf original
   });
+  if (doc.setLineHeightFactor) doc.setLineHeightFactor(1.35);
 
   // Validaciones suaves (no rompen el PDF; solo loguean)
     if (!data || typeof data !== 'object') {
@@ -883,7 +884,7 @@ function _drawAreaDimBoxClosed(doc, {x, y, w, item, lang}) {
   if (doc.roundedRect) doc.roundedRect(x, y, w, 12, 2, 2, 'F'); else doc.rect(x, y, w, 12, 'F');
   doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(0);
   doc.text(String(visible).toUpperCase(), x+6, y+8);
-  y += 16;
+  y += 18;
 
   const colX = x + 6;
   const colW = w - 12;
@@ -891,31 +892,31 @@ function _drawAreaDimBoxClosed(doc, {x, y, w, item, lang}) {
   // Nivel
   doc.setFont('helvetica','bold'); doc.setFontSize(9);
   doc.text(`${ROT.nivel} ${String(item.nivelLabel||'')} (${String(item.promedio||'0.0')}/5)`, colX, y);
-  y += 12;
+  y += 14;
 
   // Urgencia
   doc.text(ROT.urgencia, colX, y);
-  y += 10; doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
-  _wrap(doc, item.urgencia || '', colW).forEach(line => { doc.text(line, colX, y); y += 12; });
+  y += 12; doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
+  _wrap(doc, item.urgencia || '', colW).forEach(line => { doc.text(line, colX, y); y += 14; });
 
   // Consecuencia
-  y += 4; doc.setFont('helvetica','bold'); doc.setFontSize(9);
+  y += 6; doc.setFont('helvetica','bold'); doc.setFontSize(9);
   doc.text(ROT.consecuencia, colX, y);
-  y += 10; doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
-  _wrap(doc, item.consecuencia || '', colW).forEach(line => { doc.text(line, colX, y); y += 12; });
+  y += 12; doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
+  _wrap(doc, item.consecuencia || '', colW).forEach(line => { doc.text(line, colX, y); y += 14; });
 
   // Recomendación
-  y += 4; doc.setFont('helvetica','bold'); doc.setFontSize(9);
+  y += 6; doc.setFont('helvetica','bold'); doc.setFontSize(9);
   doc.text(ROT.recomendacion, colX, y);
   y += 10; doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
-  _wrap(doc, item.recomendacion || '', colW).forEach(line => { doc.text(line, colX, y); y += 12; });
+  _wrap(doc, item.recomendacion || '', colW).forEach(line => { doc.text(line, colX, y); y += 14; });
 
   // Marco
   doc.setDrawColor(210); doc.setLineWidth(0.4);
   if (doc.roundedRect) doc.roundedRect(x, y0, w, (y - y0) + 4, 2, 2);
   else doc.rect(x, y0, w, (y - y0) + 4);
 
-  return y + 10; // siguiente y
+  return y + 12; // siguiente y
 }
 
 function _renderAnalisisDimensional(doc, data, startY, left=40, totalW=520){
@@ -1212,9 +1213,14 @@ function _renderAnalisisDimensional(doc, data, startY, left=40, totalW=520){
 
     // ============ PÁGINA 5: Análisis dimensional por área ============
     doc.addPage();
-    await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP - 6, right: 40, maxW: 60, maxH: 60 });
-    let yDim = M_TOP;
-    yDim = _renderAnalisisDimensional(doc, data, yDim, M_LEFT, 520);
+    const logoH5 = await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP - 6, right: 40, maxW: 60, maxH: 60 });
+
+        // Punto de arranque para el título de la gráfica: top + alto del logo + margen
+        y = M_TOP + (logoH5 || 0) + GAP.md;   // p.ej. GAP.md = 18pt
+    
+        let yDim = M_TOP;
+    
+        yDim = _renderAnalisisDimensional(doc, data, yDim, M_LEFT, 520);
 
       
 
