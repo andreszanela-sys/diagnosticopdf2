@@ -1220,8 +1220,12 @@ function _renderAnalisisDimensional(doc, data, startY, left=40, totalW=520){
       yDim = _renderAnalisisDimensional(doc, data, yDim, M_LEFT, 520);
     
     
-       
-      
+       // ——— CTA final en una página nueva, debajo del logo ———
+      doc.addPage();
+      const logoH6 = await drawLogoTopRight(doc, data.logoUrl, { top: M_TOP, right: 40, maxW: 60, maxH: 60 });
+      let yCTA = M_TOP + (logoH6 || 0) + GAP.md;
+      drawCTASection(doc, { x: M_LEFT - 4, y: yCTA, w: 520, lang: (data.idioma === 'en' ? 'en' : 'es') });
+            
 
 
   // descarga
@@ -1401,6 +1405,83 @@ function drawAreasChartIfAny(doc, data, x, y, maxWidthPT) {
   }
 }
 
+// === CTA final: contacto y próximos pasos (con links clicables) ===
+function drawCTASection(doc, { x=40, y=40, w=520, lang='es' } = {}) {
+  const pageH = doc.internal.pageSize.getHeight();
+  const bottom = 60;
+
+  // si no cabe, crear página nueva
+  const needH = 150; // alto estimado
+  if (y + needH > pageH - bottom) {
+    doc.addPage();
+    y = 40;
+  }
+
+  // caja
+  doc.setDrawColor(210);
+  doc.setFillColor(245, 248, 252);
+  if (doc.roundedRect) doc.roundedRect(x, y, w, needH - 20, 8, 8, 'F');
+  else doc.rect(x, y, w, needH - 20, 'F');
+
+  // títulos/texto
+  const t = (lang === 'en')
+    ? {
+        title: 'Next step',
+        body: 'Would you like a focused follow-up to turn these insights into a concrete action plan?',
+        emailLbl: 'Write to:',
+        webLbl: 'Visit:',
+        note: 'We can review your results, define priorities and outline quick wins (30–40 min).'
+      }
+    : {
+        title: 'Próximo paso',
+        body: '¿Te gustaría un seguimiento puntual para convertir estos hallazgos en un plan de acción concreto?',
+        emailLbl: 'Escríbenos a:',
+        webLbl: 'Visítanos en:',
+        note: 'Podemos revisar tus resultados, definir prioridades y acordar quick wins (30–40 min).'
+      };
+
+  let yy = y + 20;
+
+  doc.setFont('helvetica','bold');  doc.setFontSize(13);
+  doc.text(t.title, x + 14, yy); yy += 18;
+
+  doc.setFont('helvetica','normal'); doc.setFontSize(10.5);
+  const bodyLines = doc.splitTextToSize(t.body, w - 28);
+  doc.text(bodyLines, x + 14, yy); yy += bodyLines.length * 14 + 6;
+
+  // — Email (clicable)
+  doc.setFont('helvetica','bold'); doc.text(t.emailLbl, x + 14, yy);
+  const mail = 'info@innovacionregenerativa.com';
+  const mailX = x + 14 + doc.getTextWidth(t.emailLbl + ' ') + 4;
+  doc.setFont('helvetica','normal');
+  doc.setTextColor(0, 102, 204);                    // azul link
+  doc.textWithLink(mail, mailX, yy, { url: 'mailto:info@innovacionregenerativa.com' });
+  // subrayado sencillo
+  const mailW = doc.getTextWidth(mail);
+  doc.line(mailX, yy + 2, mailX + mailW, yy + 2);
+  doc.setTextColor(0,0,0);
+  yy += 18;
+
+  // — Web (clicable)
+  doc.setFont('helvetica','bold'); doc.text(t.webLbl, x + 14, yy);
+  const web = 'innovacionregenerativa.com';
+  const webX = x + 14 + doc.getTextWidth(t.webLbl + ' ') + 4;
+  doc.setFont('helvetica','normal');
+  doc.setTextColor(0, 102, 204);
+  doc.textWithLink(web, webX, yy, { url: 'https://innovacionregenerativa.com' });
+  const webW = doc.getTextWidth(web);
+  doc.line(webX, yy + 2, webX + webW, yy + 2);
+  doc.setTextColor(0,0,0);
+  yy += 22;
+
+  // nota final
+  const noteLines = doc.splitTextToSize(t.note, w - 28);
+  doc.setFont('helvetica','italic'); doc.setFontSize(10);
+  doc.text(noteLines, x + 14, yy);
+  yy += noteLines.length * 13;
+
+  return yy + 10;
+}
 
 
 
